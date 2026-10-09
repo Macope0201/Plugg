@@ -169,16 +169,19 @@
   /* Flashcards */
   .modeTabs { display: flex; gap: 8px; margin-bottom: 18px; }
   .modeTabs button { height: 40px; font-size: 15px; padding: 0 18px; border-radius: 99px; }
-  .fcTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; color: var(--muted); font-size: 15px; }
-  .fcWrap { perspective: 1200px; }
-  .fcard { display: grid; min-height: 280px; cursor: pointer; position: relative; transform-style: preserve-3d; transition: transform .45s ease; border-radius: 20px; }
-  .fcard.flip { transform: rotateY(180deg); }
-  .fcard .face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #fff; }
-  .fcard .face.back { transform: rotateY(180deg); background: var(--green-soft); border-color: var(--green); }
-  .fcard .face p { margin: 0; font-size: 22px; line-height: 1.45; font-weight: 500; white-space: pre-wrap; }
-  .fcLabel { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
-  .fcHint { text-align: center; color: var(--muted); font-size: 14px; margin: 12px 0 18px; }
-  @media (prefers-reduced-motion: reduce) { .fcard { transition: none; } }
+  .fcTop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: var(--muted); font-size: 15px; }
+  .fcProg { height: 4px; background: #E8EEEC; border-radius: 99px; overflow: hidden; margin-bottom: 20px; }
+  .fcProg span { display: block; height: 100%; width: 0; background: var(--green); transition: width .25s ease; }
+  .fcard { background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 32px 28px; min-height: 220px; display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 20px; }
+  .fcQ { margin: 0; font-size: 24px; line-height: 1.4; font-weight: 600; white-space: pre-wrap; }
+  .fcA { border-top: 1px solid var(--border); padding-top: 20px; }
+  .fcA p { margin: 6px 0 0; font-size: 19px; line-height: 1.5; color: var(--green-dark); white-space: pre-wrap; }
+  .fcLabel { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .fcNav { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 20px; }
+  .fcNav .ghost:first-child { justify-self: start; }
+  .fcNav .ghost:last-child { justify-self: end; }
+  .fcNav .primary { min-width: 160px; }
+  button.ghost:disabled { background: transparent; border-color: transparent; color: #B8C4C0; }
 </style>
 </head>
 <body>
@@ -273,17 +276,19 @@
       <button type="submit" class="primary">Skicka</button>
     </form>
     <div id="cardsPane" hidden>
-      <div class="fcTop"><span id="fcCount"></span><button type="button" class="small" id="fcNew">Nya kort</button></div>
-      <div class="fcWrap">
-        <div class="fcard" id="fcard" role="button" tabindex="0" aria-label="Flashcard. Tryck för att vända kortet.">
-          <div class="face front"><span class="fcLabel">Fråga</span><p id="fcFront"></p></div>
-          <div class="face back" aria-hidden="true"><span class="fcLabel">Svar</span><p id="fcBack"></p></div>
+      <div class="fcTop"><span id="fcCount"></span><button type="button" class="ghost" id="fcNew">Nya kort</button></div>
+      <div class="fcProg" aria-hidden="true"><span id="fcProg"></span></div>
+      <div class="fcard" id="fcard">
+        <p class="fcQ" id="fcFront"></p>
+        <div class="fcA" id="fcAnswer" hidden>
+          <span class="fcLabel">Svar</span>
+          <p id="fcBack"></p>
         </div>
       </div>
-      <p class="fcHint">Klicka på kortet (eller tryck Enter) för att vända det. Pil vänster/höger bläddrar.</p>
-      <div class="examNav">
-        <button type="button" id="fcPrev">Föregående</button>
-        <button type="button" class="primary" id="fcNext">Nästa</button>
+      <div class="fcNav">
+        <button type="button" class="ghost" id="fcPrev">← Förra</button>
+        <button type="button" class="primary" id="fcFlip">Visa svar</button>
+        <button type="button" class="ghost" id="fcNext">Nästa →</button>
       </div>
     </div>
   </section>
@@ -721,33 +726,31 @@ ${s.material}
         .filter((c) => c.front && c.back);
       if (!cards.length) throw new Error('Inga flashcards skapades. Försök igen.');
       fc.cards = cards; fc.i = 0;
-      renderCard(true);
+      renderCard();
     } catch (e) {
       if (e.name !== 'AbortError') toast(e.message);
       if (!fc.cards) setMode('chat');         // inga kort att visa: tillbaka till chatten
     } finally { done(); }
   }
 
-  function renderCard(instant) {
+  function setAnswer(on) {
+    $('#fcAnswer').hidden = !on;
+    $('#fcFlip').textContent = on ? 'Dölj svar' : 'Visa svar';
+  }
+  function renderCard() {
     if (!fc.cards) return;
-    const card = $('#fcard');
     const c = fc.cards[fc.i];
-    const paint = () => { $('#fcFront').textContent = c.front; $('#fcBack').textContent = c.back; };
-    const wasFlipped = card.classList.contains('flip');
-    card.classList.remove('flip');
-    card.querySelector('.back').setAttribute('aria-hidden', 'true');
-    card.querySelector('.front').setAttribute('aria-hidden', 'false');
-    if (wasFlipped && !instant) setTimeout(paint, 230); else paint();   // vänta så svaret inte hinner synas på nästa kort
+    $('#fcFront').textContent = c.front;
+    $('#fcBack').textContent = c.back;
+    setAnswer(false);
     $('#fcCount').textContent = 'Kort ' + (fc.i + 1) + ' av ' + fc.cards.length;
+    $('#fcProg').style.width = ((fc.i + 1) / fc.cards.length * 100) + '%';
     $('#fcPrev').disabled = fc.i === 0;
     $('#fcNext').disabled = fc.i === fc.cards.length - 1;
   }
   function flipCard() {
     if (!fc.cards) return;
-    const card = $('#fcard');
-    const on = card.classList.toggle('flip');
-    card.querySelector('.back').setAttribute('aria-hidden', on ? 'false' : 'true');
-    card.querySelector('.front').setAttribute('aria-hidden', on ? 'true' : 'false');
+    setAnswer($('#fcAnswer').hidden);
   }
   function stepCard(d) {
     if (!fc.cards) return;
@@ -1087,10 +1090,7 @@ Svara ENBART med JSON:
   $('#modeTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode);
   });
-  $('#fcard').addEventListener('click', flipCard);
-  $('#fcard').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); }
-  });
+  $('#fcFlip').addEventListener('click', flipCard);
   $('#fcPrev').addEventListener('click', () => stepCard(-1));
   $('#fcNext').addEventListener('click', () => stepCard(1));
   $('#fcNew').addEventListener('click', makeCards);
