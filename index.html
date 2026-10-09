@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plugga – öva och prova med AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F8F9;
+    --card: #FFFFFF;
+    --ink: #14201C;
+    --muted: #5F6F6A;
+    --border: #DCE3E0;
+    --field: #F8FAFA;
+    --green: #1F6B57;
+    --green-soft: #E5F0EC;
+    --green-off: #A9C4BB;
+    --amber: #B7791F;
+    --red: #B83245;
+    --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  :root { --green-dark: #174F40; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.5; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid rgba(31,107,87,.45); outline-offset: 2px; }
+
+  .top { max-width: 800px; margin: 0 auto; padding: 20px 20px 8px; display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; color: var(--ink); text-decoration: none; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--green); color: #fff; display: grid; place-items: center; }
+  main { max-width: 800px; margin: 0 auto; padding: 12px 20px 90px; }
+
+  .card {
+    background: var(--card); border-radius: 22px; padding: clamp(22px, 5vw, 48px);
+    box-shadow: 0 1px 2px rgba(20,32,28,.04), 0 12px 40px rgba(20,32,28,.06);
+  }
+  .cardTitle { display: flex; align-items: center; gap: 12px; font-size: 26px; line-height: 1.2; font-weight: 700; margin: 0 0 28px; letter-spacing: -0.01em; }
+  .cardTitle svg { color: var(--green); flex: none; }
+  h2 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+
+  .field { margin-bottom: 20px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; gap: 0; } }
+  label, .lbl { display: block; font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  input[type=text], input[type=number], input[type=password], select, textarea {
+    width: 100%; font: inherit; color: var(--ink); background: var(--field);
+    border: 1px solid var(--border); border-radius: 12px; padding: 12px 15px; height: 48px;
+  }
+  input::placeholder, textarea::placeholder { color: #7B8A85; }
+  textarea { height: auto; resize: vertical; line-height: 1.55; }
+  select { appearance: none; cursor: pointer; padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235F6F6A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; }
+  select:disabled { background-color: #F0F3F2; color: #7B8A85; cursor: not-allowed; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,107,87,.18); }
+  #material { min-height: 240px; }
+  .counter { display: flex; justify-content: flex-end; gap: 12px; margin: 8px 0 26px; font-size: 14px; color: var(--muted); }
+  .counter.over { color: var(--red); font-weight: 600; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .actions.two > button { flex: 1 1 180px; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 12px; padding: 0 22px; height: 52px;
+    border: 1.5px solid var(--green); background: transparent; color: var(--green); font-size: 17px;
+    transition: background .15s, color .15s;
+  }
+  button.primary { background: var(--green); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--green-dark); }
+  button:not(.primary):not(.ghost):hover:not(:disabled) { background: var(--green-soft); }
+  button:disabled { cursor: not-allowed; background: var(--green-off); border-color: var(--green-off); color: #fff; }
+  button.secondary:disabled { background: transparent; color: var(--green-off); }
+  button.ghost { border-color: transparent; height: 40px; padding: 0 12px; font-size: 15px; color: var(--muted); font-weight: 500; }
+  button.ghost:hover { background: #E9EEEC; }
+  button.small { height: 40px; font-size: 15px; padding: 0 16px; }
+
+  /* Plugga */
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .bar h2 { margin: 0; }
+  .bar p { margin: 0; color: var(--muted); font-size: 15px; }
+  #chatLog { display: flex; flex-direction: column; gap: 14px; padding-bottom: 14px; }
+  .msg { max-width: 92%; padding: 13px 17px; border-radius: 16px; line-height: 1.6; }
+  .msg p { margin: 0 0 10px; } .msg p:last-child { margin-bottom: 0; }
+  .msg ul { margin: 0 0 10px; padding-left: 22px; }
+  .msg code { background: #E8EEEC; padding: 1px 5px; border-radius: 4px; font-size: .92em; }
+  .msg.ai { background: var(--green-soft); border-top-left-radius: 4px; }
+  .msg.user { background: var(--green); color: #fff; margin-left: auto; border-top-right-radius: 4px; }
+  .msg.err { background: #FDECEF; color: #7C1226; border: 1px solid #F1B5C0; }
+  .msg.typing { color: var(--muted); font-style: italic; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+  .chips button { height: 36px; padding: 0 15px; font-size: 14.5px; border-radius: 99px; font-weight: 500; border-color: var(--border); color: var(--ink); background: #fff; }
+  .chips button:hover:not(:disabled) { border-color: var(--green); }
+  .chatForm { display: flex; gap: 10px; align-items: flex-end; border-top: 1px solid var(--border); padding-top: 16px; }
+  .chatForm textarea { min-height: 52px; max-height: 180px; height: 52px; }
+
+  /* Prov */
+  .examTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+  .examTitle { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .examSub { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+  .timerPill { display: inline-flex; align-items: center; gap: 8px; background: var(--green-soft); color: var(--green); border-radius: 99px; padding: 6px 14px; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .timerPill.low { background: #FBF1DD; color: #8A5A12; }
+  .progressBar { height: 8px; background: #E8EEEC; border-radius: 99px; overflow: hidden; }
+  .progressBar span { display: block; height: 100%; width: 0; background: var(--green); border-radius: 99px; transition: width .3s ease; }
+  .progressText { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  #qArea { margin: 28px 0 8px; min-height: 260px; }
+  .qhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .qnum { font-weight: 700; color: var(--green); }
+  .pts { font-size: 13.5px; font-weight: 600; color: var(--green); background: var(--green-soft); border-radius: 99px; padding: 2px 11px; }
+  .qtext { margin: 0 0 18px; white-space: pre-wrap; font-size: 20px; line-height: 1.45; font-weight: 500; }
+  fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+  legend { font-size: 14px; color: var(--muted); margin-bottom: 10px; padding: 0; }
+  .opt { position: relative; display: flex; gap: 14px; align-items: center; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; font-weight: 400; margin: 0; background: #fff; }
+  .opt:hover { border-color: var(--green); }
+  .opt:has(input:checked) { border-color: var(--green); background: var(--green-soft); }
+  .opt:has(input:focus-visible) { outline: 3px solid rgba(31,107,87,.45); outline-offset: 2px; }
+  .opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .opt .letter { width: 30px; height: 30px; border-radius: 50%; background: var(--field); border: 1px solid var(--border); display: grid; place-items: center; font-size: 14px; font-weight: 600; flex: none; color: var(--muted); }
+  .opt:has(input:checked) .letter { background: var(--green); border-color: var(--green); color: #fff; }
+  #qArea textarea { min-height: 150px; font-size: 16.5px; }
+  .dots { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
+  .dot { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 14px; font-weight: 600; border: 1.5px solid var(--border); color: var(--muted); background: #fff; }
+  .dot.done { background: var(--green-soft); border-color: var(--green-soft); color: var(--green); }
+  .dot.cur { border-color: var(--green); color: var(--green); box-shadow: 0 0 0 3px rgba(31,107,87,.15); }
+  .examNav { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 20px; }
+  .examNav button { min-width: 150px; }
+  .examNav button:disabled { background: transparent; color: var(--green-off); border-color: var(--border); }
+
+  /* Resultat */
+  .resultTop { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; margin-bottom: 26px; }
+  .ring { width: 156px; height: 156px; flex: none; }
+  .score { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 520px) { .stats { grid-template-columns: 1fr; } }
+  .stat { background: var(--field); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; }
+  .stat span { display: block; font-size: 13.5px; color: var(--muted); }
+  .stat strong { font-size: 21px; font-variant-numeric: tabular-nums; }
+  .panel { background: var(--field); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 20px; }
+  .weak { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+  .weak li { background: #fff; border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 10px; padding: 12px 16px; }
+  .weak strong { display: block; }
+  .limitsRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { border: 1px solid var(--border); background: #fff; border-radius: 99px; padding: 5px 15px; font-size: 14.5px; color: var(--muted); }
+  .chip.on { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+  details { margin-top: 24px; }
+  summary { cursor: pointer; font-weight: 600; padding: 8px 0; color: var(--green); }
+  .review { border-left: 4px solid var(--border); padding: 4px 0 4px 16px; margin: 14px 0; }
+  .review.full { border-color: var(--green); } .review.part { border-color: #D9A441; } .review.none { border-color: #D96A7B; }
+  .review .got { font-weight: 700; }
+  .review p { margin: 4px 0; white-space: pre-wrap; }
+  .review .model { color: var(--muted); }
+
+  #loading { position: fixed; inset: 0; background: rgba(246,248,249,.95); display: grid; place-items: center; z-index: 20; text-align: center; padding: 24px; }
+  #loading p { font-size: 19px; font-weight: 600; margin: 18px 0; }
+  .spin { width: 44px; height: 44px; border: 5px solid var(--green-soft); border-top-color: var(--green); border-radius: 50%; animation: spin .9s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #7C1226; color: #fff; padding: 14px 20px; border-radius: 12px; max-width: min(560px, 92vw); z-index: 30; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  dialog { border: 0; border-radius: 20px; padding: 28px; max-width: 500px; width: 92vw; font-family: var(--font); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(20,32,28,.5); }
+  dialog p { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
+  dialog a { color: var(--green); font-weight: 600; }
+  dialog { max-height: 90vh; overflow-y: auto; }
+  .keyRow { margin-bottom: 14px; }
+  .keyRow label { margin-bottom: 4px; }
+  .keyRow .keyHint { display: block; font-size: 13.5px; color: var(--muted); margin-bottom: 6px; }
+
+  /* Flashcards */
+  .modeTabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .modeTabs button { height: 40px; font-size: 15px; padding: 0 18px; border-radius: 99px; }
+  .fcTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; color: var(--muted); font-size: 15px; }
+  .fcWrap { perspective: 1200px; }
+  .fcard { display: grid; min-height: 280px; cursor: pointer; position: relative; transform-style: preserve-3d; transition: transform .45s ease; border-radius: 20px; }
+  .fcard.flip { transform: rotateY(180deg); }
+  .fcard .face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #fff; }
+  .fcard .face.back { transform: rotateY(180deg); background: var(--green-soft); border-color: var(--green); }
+  .fcard .face p { margin: 0; font-size: 22px; line-height: 1.45; font-weight: 500; white-space: pre-wrap; }
+  .fcLabel { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
+  .fcHint { text-align: center; color: var(--muted); font-size: 14px; margin: 12px 0 18px; }
+  @media (prefers-reduced-motion: reduce) { .fcard { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a href="#" class="brand" id="homeLink">
+    <span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M9 8h6M9 12h6"/></svg></span>
+    Plugga
+  </a>
+  <button class="ghost" id="keyBtn" type="button">API-nyckel</button>
+</div>
+
+<main>
+
+  <!-- STARTSIDA -->
+  <section id="view-home" class="card">
+    <h1 class="cardTitle">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2"/></svg>
+      Klistra in ditt material
+    </h1>
+
+    <div class="field">
+      <label for="subject">Ämne</label>
+      <input type="text" id="subject" placeholder="t.ex. Biologi" autocomplete="off">
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label for="level">Skolnivå</label>
+        <select id="level">
+          <option value="">Välj skolnivå</option>
+          <option value="grundskola">Grundskola</option>
+          <option value="gymnasiet">Gymnasiet</option>
+          <option value="universitet">Högskola/universitet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="grade">Årskurs</label>
+        <select id="grade" disabled><option value="">Välj skolnivå först</option></select>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label for="timer">Timer i minuter (valfri)</label>
+        <input type="number" id="timer" min="1" max="240" placeholder="t.ex. 60" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="count">Antal frågor</label>
+        <select id="count">
+          <option value="5">5 frågor</option>
+          <option value="10" selected>10 frågor</option>
+          <option value="15">15 frågor</option>
+          <option value="20">20 frågor</option>
+          <option value="30">30 frågor</option>
+          <option value="40">40 frågor</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:0">
+      <label for="material">Material <span style="font-weight:400;color:var(--muted)">(minst 30 ord – instuderingsfrågor, begrepp, anteckningar)</span></label>
+      <textarea id="material" spellcheck="false" placeholder="Klistra in dina anteckningar, sammanfattning eller instuderingsfrågor här…"></textarea>
+    </div>
+    <div class="counter" id="counter"><span id="counterMsg"></span><span id="wordCount">0 / 20 000 ord</span></div>
+
+    <div class="actions two">
+      <button type="button" class="primary" id="studyBtn">Börja Plugga</button>
+      <button type="button" class="secondary" id="examBtn">Starta Prov</button>
+    </div>
+  </section>
+
+  <!-- PLUGGA -->
+  <section id="view-study" class="card" hidden>
+    <div class="bar">
+      <div><h2>Plugga</h2><p id="studyTitle"></p></div>
+      <button type="button" class="small" id="studyExit">Avsluta</button>
+    </div>
+    <div class="modeTabs" id="modeTabs">
+      <button type="button" class="primary" data-mode="chat" aria-pressed="true">Chatt</button>
+      <button type="button" data-mode="cards" aria-pressed="false">Flashcards</button>
+    </div>
+    <div id="chatLog" aria-live="polite"></div>
+    <div class="chips" id="chips">
+      <button type="button" data-say="Förhör mig på materialet, en fråga i taget.">Förhör mig</button>
+      <button type="button" data-say="Sammanfatta de viktigaste delarna av materialet.">Sammanfatta</button>
+      <button type="button" data-say="Vilka är de viktigaste begreppen jag måste kunna? Förklara dem enkelt.">Begrepp</button>
+      <button type="button" data-say="Ge mig en svårare fråga än den förra.">Svårare fråga</button>
+    </div>
+    <form class="chatForm" id="chatForm">
+      <textarea id="chatInput" rows="1" placeholder="Skriv ett svar eller ställ en fråga (Enter skickar)" aria-label="Meddelande"></textarea>
+      <button type="submit" class="primary">Skicka</button>
+    </form>
+    <div id="cardsPane" hidden>
+      <div class="fcTop"><span id="fcCount"></span><button type="button" class="small" id="fcNew">Nya kort</button></div>
+      <div class="fcWrap">
+        <div class="fcard" id="fcard" role="button" tabindex="0" aria-label="Flashcard. Tryck för att vända kortet.">
+          <div class="face front"><span class="fcLabel">Fråga</span><p id="fcFront"></p></div>
+          <div class="face back" aria-hidden="true"><span class="fcLabel">Svar</span><p id="fcBack"></p></div>
+        </div>
+      </div>
+      <p class="fcHint">Klicka på kortet (eller tryck Enter) för att vända det. Pil vänster/höger bläddrar.</p>
+      <div class="examNav">
+        <button type="button" id="fcPrev">Föregående</button>
+        <button type="button" class="primary" id="fcNext">Nästa</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROV -->
+  <section id="view-exam" hidden>
+    <div class="card" id="examCard">
+      <div class="examTop">
+        <div>
+          <p class="examTitle" id="examTitle"></p>
+          <p class="examSub" id="examSub"></p>
+        </div>
+        <div class="timerPill" id="timerPill" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>
+          <span>Tid kvar</span> <span id="timerVal">00:00</span>
+        </div>
+      </div>
+      <div class="progressBar" aria-hidden="true"><span id="progressFill"></span></div>
+      <p class="progressText" id="progressText"></p>
+
+      <div id="qArea"></div>
+
+      <div class="dots" id="dots" aria-label="Hoppa till fråga"></div>
+      <div class="examNav">
+        <button type="button" id="prevBtn">Föregående</button>
+        <button type="button" class="primary" id="nextBtn">Nästa</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTAT -->
+  <section id="view-result" class="card" hidden>
+    <h1 class="cardTitle" style="margin-bottom:26px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+      Ditt resultat
+    </h1>
+    <div class="resultTop">
+      <div class="ring" id="ring" role="img" aria-label="Betyg och procent"></div>
+      <div style="flex:1 1 280px;min-width:0">
+        <p class="score" id="scoreLine"></p>
+        <p id="summary" style="max-width:48ch;margin:0"></p>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="panel">
+      <h2>Träna mer på</h2>
+      <ul class="weak" id="weakList"></ul>
+    </div>
+
+    <div class="panel">
+      <h2>Betygsgränser</h2>
+      <div class="limitsRow" id="limitsRow"></div>
+    </div>
+
+    <div class="actions two">
+      <button type="button" class="primary" id="retryBtn">Gör om provet</button>
+      <button type="button" id="studyFromResultBtn">Plugga</button>
+      <button type="button" id="homeFromResultBtn">Till startsidan</button>
+    </div>
+    <p style="color:var(--muted);font-size:14px;margin:12px 0 0">Gör om provet ger nya frågor på samma material.</p>
+
+    <details>
+      <summary>Gå igenom dina svar</summary>
+      <div id="reviewList"></div>
+    </details>
+  </section>
+
+</main>
+
+<div id="loading" hidden>
+  <div>
+    <div class="spin"></div>
+    <p id="loadingText">Jobbar …</p>
+    <button type="button" id="cancelBtn" class="small">Avbryt</button>
+  </div>
+</div>
+
+<div id="toast" role="alert" hidden></div>
+
+<dialog id="keyDialog">
+  <h2>Dina gratis API-nycklar</h2>
+  <p>AI:n drivs av flera gratistjänster. Du behöver bara en nyckel för att börja, men ju fler du lägger in desto längre kan du plugga: när en tjänst når sin gratisgräns byter sidan automatiskt till nästa. Alla nycklar skaffas gratis, ingen betalning behövs. Nycklarna sparas bara i din webbläsare och skickas bara till respektive tjänst. Obs: på gratisnivåer kan tjänsterna använda det du skickar för att förbättra sina produkter, så lägg inte in personuppgifter.</p>
+  <div id="keyRows"></div>
+  <div class="actions" style="margin-top:18px">
+    <button type="button" class="primary small" id="keySave">Spara</button>
+    <button type="button" class="small" id="keyRemove">Ta bort alla</button>
+    <button type="button" class="ghost" id="keyClose">Stäng</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Inställningar ---------- */
+  const MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash-lite']; // gratis. Om en modell försvunnit används nästa i listan
+  let modelIdx = 0;
+  let noThinking = false;
+  const retryErr = (m) => Object.assign(new Error(m), { retry: true });
+  const MAX_WORDS = 20000;
+  const MIN_WORDS = 30;
+  const LIMITS = [['A', 90], ['B', 80], ['C', 70], ['D', 60], ['E', 50]]; // % av max poäng
+  const LEVELS = {
+    grundskola:  { label: 'Grundskola', grades: ['Årskurs 4', 'Årskurs 5', 'Årskurs 6', 'Årskurs 7', 'Årskurs 8', 'Årskurs 9'] },
+    gymnasiet:   { label: 'Gymnasiet', grades: ['Årskurs 1', 'Årskurs 2', 'Årskurs 3'] },
+    universitet: { label: 'Högskola/universitet', grades: ['Grundnivå', 'Avancerad nivå'] }
+  };
+
+  // Gratis AI-tjänster, i den ordning de används. Tar en slut (eller är överbelastad) går sidan automatiskt vidare till nästa som har en nyckel.
+  // Modellnamn kan ändras av tjänsterna med tiden. Försvunna modeller hoppas över automatiskt, men lägg gärna till nya i listorna.
+  const PROVIDERS = [
+    { id: 'gemini',     name: 'Google Gemini', store: 'plugga.gkey',           models: MODELS,
+      link: 'https://aistudio.google.com/app/apikey', linkText: 'aistudio.google.com/app/apikey', hint: 'Logga in med Google, välj "Create API key".', ph: 'AIza…' },
+    { id: 'groq',       name: 'Groq',          store: 'plugga.key.groq',       models: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'],
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      link: 'https://console.groq.com/keys', linkText: 'console.groq.com/keys', hint: 'Skapa ett gratiskonto och välj "Create API Key".', ph: 'gsk_…' },
+    { id: 'openrouter', name: 'OpenRouter',    store: 'plugga.key.openrouter', models: ['openai/gpt-oss-120b:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free'],
+      url: 'https://openrouter.ai/api/v1/chat/completions', noJsonMode: true,
+      link: 'https://openrouter.ai/keys', linkText: 'openrouter.ai/keys', hint: 'Använder bara modeller som är gratis (slutar på :free).', ph: 'sk-or-…' },
+    { id: 'cohere',     name: 'Cohere',        store: 'plugga.key.cohere',     models: ['command-a-03-2025', 'command-r-plus-08-2024', 'command-r-08-2024'],
+      url: 'https://api.cohere.ai/compatibility/v1/chat/completions', noJsonMode: true,
+      link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com/api-keys', hint: 'Använd den gratis "Trial"-nyckeln.', ph: 'Din Cohere-nyckel' },
+    { id: 'sambanova',  name: 'SambaNova',     store: 'plugga.key.sambanova',  models: ['Meta-Llama-3.3-70B-Instruct', 'gpt-oss-120b', 'Meta-Llama-3.1-8B-Instruct'],
+      url: 'https://api.sambanova.ai/v1/chat/completions', noJsonMode: true,
+      link: 'https://cloud.sambanova.ai/apis', linkText: 'cloud.sambanova.ai/apis', hint: 'Skapa ett konto och en API-nyckel.', ph: 'Din SambaNova-nyckel' }
+  ];
+  const cool = {};   // tjänst-id -> tidpunkt då den får användas igen (efter att gratisgränsen nåtts)
+  const hasKey = () => PROVIDERS.some((p) => store.get(p.store));
+
+  const $ = (s) => document.querySelector(s);
+  const fc = { cards: null, i: 0, focus: '' };   // flashcards i pluggläget
+  const state = { s: null, exam: null, answers: {}, chat: [], weak: '', abort: null, timer: null, t0: 0, limit: 0, grading: false, cur: 0, usedSec: 0 };
+
+  /* ---------- Hjälpfunktioner ---------- */
+  function el(tag, props = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const words = (t) => (t.trim() ? t.trim().split(/\s+/).length : 0);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* fullt eller blockerat */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } }
+  };
+
+  function show(name) {
+    for (const v of ['home', 'study', 'exam', 'result']) $('#view-' + v).hidden = v !== name;
+    window.scrollTo(0, 0);
+  }
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.id); toast.id = setTimeout(() => (t.hidden = true), 7000);
+  }
+  function loading(text) { $('#loadingText').textContent = text; $('#loading').hidden = false; }
+  function done() { $('#loading').hidden = true; }
+  const mmss = (sec) => String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+
+  // Enkel och säker markdown: **fet**, `kod`, listor, stycken
+  function md(text) {
+    const lines = esc(text).split('\n');
+    let html = '', list = false;
+    for (const raw of lines) {
+      const line = raw.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+      const li = line.match(/^\s*[-*•]\s+(.*)/) || line.match(/^\s*\d+[.)]\s+(.*)/);
+      if (li) { if (!list) { html += '<ul>'; list = true; } html += '<li>' + li[1] + '</li>'; continue; }
+      if (list) { html += '</ul>'; list = false; }
+      if (line.trim()) html += '<p>' + line.replace(/^#+\s*/, '') + '</p>';
+    }
+    if (list) html += '</ul>';
+    return html;
+  }
+
+  /* ---------- API (flera gratis AI-tjänster med automatiskt byte) ---------- */
+  async function callClaude({ system, messages, maxTokens, json }) {
+    const active = PROVIDERS.filter((p) => store.get(p.store));
+    if (!active.length) { openKeyDialog(); throw new Error('Lägg först in minst en gratis API-nyckel.'); }
+    state.abort = new AbortController();
+    const signal = state.abort.signal;
+    const makeGeminiBody = (model) => JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+      generationConfig: Object.assign(
+        { maxOutputTokens: maxTokens },
+        json ? { responseMimeType: 'application/json' } : {},
+        (model.startsWith('gemini-3') && !noThinking) ? { thinkingConfig: { thinkingLevel: 'low' } } : {}  // snabbare och mindre risk att svaret tar slut
+      )
+    });
+    const makeChatBody = (p, model) => JSON.stringify(Object.assign({
+      model,
+      messages: [{ role: 'system', content: system }].concat(messages.map((m) => ({ role: m.role, content: m.content }))),
+      max_tokens: maxTokens
+    }, (json && !p.noJsonMode) ? { response_format: { type: 'json_object' } } : {}));
+    const send = (p, key, model) => (p.id === 'gemini'
+      ? fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+          method: 'POST', signal,
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+          body: makeGeminiBody(model)
+        })
+      : fetch(p.url, {
+          method: 'POST', signal,
+          headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + key },
+          body: makeChatBody(p, model)
+        }));
+    const wait = (ms) => new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, ms);
+      signal.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Avbruten', 'AbortError')); }, { once: true });
+    });
+
+    let overloaded = false, limited = false, netFail = false, lastErr = '';
+    const authFailed = [];
+    for (let round = 0; round < 3; round++) {            // upp till 3 omgångar vid överbelastning
+      overloaded = false;
+      for (const p of active) {                          // prova tjänsterna i tur och ordning
+        if ((cool[p.id] || 0) > Date.now()) { limited = true; continue; }   // nådde nyss gratisgränsen: hoppa över en stund
+        const key = store.get(p.store);
+        let provLimited = false;
+        for (let i = (p.id === 'gemini' ? modelIdx : 0); i < p.models.length; i++) {   // prova tjänstens modeller i tur och ordning
+          const model = p.models[i];
+          let res;
+          try {
+            res = await send(p, key, model);
+          } catch (e) {
+            if (e.name === 'AbortError') throw e;
+            netFail = true; break;                       // nådde inte tjänsten: prova nästa tjänst
+          }
+          if (res.ok) {
+            const data = await res.json();
+            if (p.id === 'gemini') {
+              const cand = data.candidates && data.candidates[0];
+              if (!cand || !cand.content || !cand.content.parts) throw retryErr('AI:n gav inget svar (' + ((cand && cand.finishReason) || (data.promptFeedback && data.promptFeedback.blockReason) || 'okänd orsak') + '). Försök igen.');
+              if (cand.finishReason === 'MAX_TOKENS' && json) throw retryErr('Svaret blev för långt och avbröts. Försök igen, gärna med färre frågor.');
+              return cand.content.parts.map((x) => x.text || '').join('');
+            }
+            const choice = data.choices && data.choices[0];
+            const text = choice && choice.message && choice.message.content;
+            if (choice && choice.finish_reason === 'length' && json) throw retryErr('Svaret blev för långt och avbröts. Försök igen, gärna med färre frågor.');
+            if (!text) { lastErr = p.name + ' gav inget svar.'; continue; }   // tomt svar: prova nästa modell
+            return text;
+          }
+          let detail = '';
+          try { const j = await res.json(); detail = (j.error && j.error.message) || j.message || ''; } catch { /* ignore */ }
+          if (p.id === 'gemini' && res.status === 400 && /thinking/i.test(detail) && !noThinking) { noThinking = true; i--; continue; }  // modellen gillar inte inställningen: försök utan
+          if (res.status === 401 || ([400, 403].includes(res.status) && /api key|permission|credential|unauthor/i.test(detail))) {
+            authFailed.push(p.name); break;              // nyckeln fungerar inte: prova nästa tjänst
+          }
+          if (res.status === 404) { if (p.id === 'gemini' && i === modelIdx) modelIdx = i + 1; continue; }   // modellen finns inte längre
+          if (res.status === 429) { limited = true; provLimited = true; continue; }                          // gränsen nådd: prova nästa modell
+          if ([500, 502, 503, 504].includes(res.status)) { overloaded = true; continue; }                    // överbelastad: prova nästa modell
+          if (res.status === 402) { limited = true; provLimited = true; break; }                              // slut på gratistegodo: nästa tjänst
+          lastErr = 'Något gick fel hos AI:n (' + res.status + '). ' + detail;                                // annat fel: prova nästa modell/tjänst
+        }
+        if (provLimited) cool[p.id] = Date.now() + 60000;   // vila tjänsten i en minut
+      }
+      if (!overloaded) break;
+      await wait(3000 * (round + 1));                    // vänta en stund och försök igen
+    }
+    if (overloaded) throw new Error('AI:n är överbelastad just nu. Det går oftast över snabbt – försök igen om en minut.');
+    if (limited) throw new Error('Alla dina gratis AI-tjänster har nått sin gräns för tillfället. Vänta en minut (eller till i morgon), eller lägg in en nyckel till för en till tjänst.');
+    if (authFailed.length) throw new Error('API-nyckeln fungerar inte (' + authFailed.join(', ') + '). Kontrollera den och försök igen.');
+    if (netFail) throw new Error('Kunde inte nå AI:n. Kontrollera din internetanslutning.');
+    if (lastErr) throw new Error(lastErr);
+    throw new Error('Ingen AI-modell är tillgänglig just nu. Försök igen senare.');
+  }
+
+  async function withRetry(fn) {            // ett automatiskt omförsök om svaret var trasigt
+    try { return await fn(); }
+    catch (e) { if (!e.retry) throw e; return await fn(); }
+  }
+
+  function parseJSON(t) {
+    t = t.replace(/```json|```/g, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a < 0 || b < 0) throw retryErr('Svaret från AI:n gick inte att läsa. Försök igen.');
+    try { return JSON.parse(t.slice(a, b + 1)); }
+    catch { throw retryErr('Svaret blev ofullständigt. Försök igen, gärna med färre frågor.'); }
+  }
+
+  /* ---------- Startsida ---------- */
+  function fillGrades(selected) {
+    const lv = LEVELS[$('#level').value];
+    const g = $('#grade');
+    g.replaceChildren();
+    if (!lv) { g.append(el('option', { value: '', text: 'Välj skolnivå först' })); g.disabled = true; return; }
+    g.disabled = false;
+    g.append(el('option', { value: '', text: 'Välj årskurs' }));
+    lv.grades.forEach((x) => g.append(el('option', { value: x, text: x })));
+    if (selected && lv.grades.includes(selected)) g.value = selected;
+  }
+  function readSetup() {
+    const lv = LEVELS[$('#level').value];
+    const grade = $('#grade').value;
+    return {
+      subject: $('#subject').value.trim(),
+      level: $('#level').value,
+      grade,
+      course: lv && grade ? lv.label + ', ' + grade : '',
+      timer: Math.max(0, Math.min(240, parseInt($('#timer').value, 10) || 0)),
+      count: Math.max(3, Math.min(40, parseInt($('#count').value, 10) || 10)),
+      material: $('#material').value.trim()
+    };
+  }
+  function saveSetup() { store.set('plugga.setup', JSON.stringify(readSetup())); }
+  function refreshHome() {
+    const s = readSetup();
+    const n = words($('#material').value);
+    const over = n > MAX_WORDS;
+    $('#wordCount').textContent = n.toLocaleString('sv-SE') + ' / 20 000 ord';
+    $('#counterMsg').textContent = over ? 'För mycket – korta ner med ' + (n - MAX_WORDS).toLocaleString('sv-SE') + ' ord.' : '';
+    $('#counter').classList.toggle('over', over);
+    const ok = !!(s.subject && s.course && n >= MIN_WORDS && !over);
+    $('#studyBtn').disabled = $('#examBtn').disabled = !ok;
+  }
+  function validSetup() {
+    const s = readSetup();
+    if (!s.subject || !s.course || words(s.material) < MIN_WORDS || words(s.material) > MAX_WORDS) return null;
+    if (!hasKey()) { openKeyDialog(); return null; }
+    state.s = s;
+    return s;
+  }
+
+  /* ---------- Plugga-läge ---------- */
+  function studySystem(s) {
+    return `Du är en tålmodig och engagerande studiecoach som hjälper en elev att plugga.
+Ämne: ${s.subject}. Elevens nivå: ${s.course}. Anpassa språk och svårighetsgrad efter den nivån.
+
+Eleven har klistrat in sitt studiematerial nedan. Utgå i första hand från det. Om eleven frågar om något som inte finns i materialet får du ändå hjälpa till, men säg tydligt att det inte stod i materialet.
+
+Så coachar du:
+- Förklara enkelt, med exempel, och bygg vidare på det eleven redan kan.
+- När du förhör: ställ EN fråga i taget och vänta på svar. Ge sedan konkret feedback, rätta missförstånd vänligt och föreslå nästa steg.
+- Håll svaren korta (högst ca 150 ord) om eleven inte ber om mer.
+- Svara alltid på svenska.
+
+<material>
+${s.material}
+</material>`;
+  }
+
+  function addMsg(role, text) {
+    const m = el('div', { class: 'msg ' + role });
+    if (role === 'user') m.textContent = text; else m.innerHTML = md(text);
+    $('#chatLog').append(m);
+    m.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    return m;
+  }
+
+  async function sendChat() {
+    const typing = addMsg('ai typing', 'Skriver …');
+    $('#chatInput').disabled = true;
+    try {
+      const reply = await callClaude({
+        system: studySystem(state.s),
+        messages: state.chat.map(({ role, content }) => ({ role, content })),
+        maxTokens: 8000
+      });
+      typing.remove();
+      state.chat.push({ role: 'assistant', content: reply });
+      addMsg('ai', reply);
+    } catch (e) {
+      typing.remove();
+      state.chat.pop();                       // ta bort meddelandet som inte gick fram
+      if (e.name !== 'AbortError') addMsg('err', e.message);
+    } finally {
+      $('#chatInput').disabled = false;
+      $('#chatInput').focus({ preventScroll: true });
+    }
+  }
+
+  function startStudy(focus) {
+    const s = validSetup(); if (!s) return;
+    state.chat = []; $('#chatLog').replaceChildren();
+    fc.cards = null; fc.i = 0; fc.focus = focus || ''; setMode('chat');
+    $('#studyTitle').textContent = s.subject + ' – ' + s.course;
+    show('study');
+    const first = focus
+      ? 'Jag gjorde ett prov och behöver träna mer på detta:\n' + focus + '\nHjälp mig med det. Börja med att förklara det viktigaste kort och ställ sedan en fråga till mig.'
+      : 'Hej! Jag vill börja plugga. Hälsa kort och föreslå hur vi kan börja.';
+    state.chat.push({ role: 'user', content: first });
+    sendChat();
+  }
+
+  /* ---------- Plugga-läge: flashcards ---------- */
+  function setMode(m) {
+    const cards = m === 'cards';
+    for (const id of ['chatLog', 'chips', 'chatForm']) $('#' + id).hidden = cards;
+    $('#cardsPane').hidden = !cards;
+    document.querySelectorAll('#modeTabs button').forEach((b) => {
+      const on = b.dataset.mode === m;
+      b.classList.toggle('primary', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (cards && !fc.cards) makeCards();
+  }
+
+  function cardsPrompt(s) {
+    const prev = fc.cards ? '\n- Undvik dessa frågor som redan använts: ' + fc.cards.map((c) => c.front).join(' | ') : '';
+    const focus = fc.focus ? '\n- Eleven behöver extra träning på detta, lägg gärna fler kort här:\n' + fc.focus : '';
+    return `Skapa 12 flashcards för att plugga i ämnet "${s.subject}" för elever på nivån "${s.course}".
+
+Regler:
+- Använd ENDAST innehållet i underlaget nedan. Täck så stor del av underlaget som möjligt, och välj själv de viktigaste begreppen, fakta och sambanden.
+- "front" är en kort fråga eller ett begrepp. "back" är ett kort, tydligt svar (1–3 meningar). Skriv aldrig svaret på framsidan.
+- Anpassa språk och svårighetsgrad till nivån ${s.course}. Skriv på svenska.${prev}${focus}
+
+Svara ENBART med JSON, utan förklaringar eller markdown, i exakt detta format:
+{"cards":[{"front":"...","back":"..."}]}
+
+<underlag>
+${s.material}
+</underlag>`;
+  }
+
+  async function makeCards() {
+    const s = state.s; if (!s) return;
+    loading('Skapar flashcards …');
+    try {
+      const data = await withRetry(() => callClaude({
+        system: 'Du är en erfaren lärare som gör tydliga flashcards för plugg. Du svarar bara med giltig JSON.',
+        messages: [{ role: 'user', content: cardsPrompt(s) }],
+        maxTokens: 8000,
+        json: true
+      }).then(parseJSON));
+      const cards = (data.cards || [])
+        .map((c) => ({ front: String(c.front || '').trim(), back: String(c.back || '').trim() }))
+        .filter((c) => c.front && c.back);
+      if (!cards.length) throw new Error('Inga flashcards skapades. Försök igen.');
+      fc.cards = cards; fc.i = 0;
+      renderCard(true);
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.message);
+      if (!fc.cards) setMode('chat');         // inga kort att visa: tillbaka till chatten
+    } finally { done(); }
+  }
+
+  function renderCard(instant) {
+    if (!fc.cards) return;
+    const card = $('#fcard');
+    const c = fc.cards[fc.i];
+    const paint = () => { $('#fcFront').textContent = c.front; $('#fcBack').textContent = c.back; };
+    const wasFlipped = card.classList.contains('flip');
+    card.classList.remove('flip');
+    card.querySelector('.back').setAttribute('aria-hidden', 'true');
+    card.querySelector('.front').setAttribute('aria-hidden', 'false');
+    if (wasFlipped && !instant) setTimeout(paint, 230); else paint();   // vänta så svaret inte hinner synas på nästa kort
+    $('#fcCount').textContent = 'Kort ' + (fc.i + 1) + ' av ' + fc.cards.length;
+    $('#fcPrev').disabled = fc.i === 0;
+    $('#fcNext').disabled = fc.i === fc.cards.length - 1;
+  }
+  function flipCard() {
+    if (!fc.cards) return;
+    const card = $('#fcard');
+    const on = card.classList.toggle('flip');
+    card.querySelector('.back').setAttribute('aria-hidden', on ? 'false' : 'true');
+    card.querySelector('.front').setAttribute('aria-hidden', on ? 'true' : 'false');
+  }
+  function stepCard(d) {
+    if (!fc.cards) return;
+    const n = fc.i + d;
+    if (n < 0 || n >= fc.cards.length) return;
+    fc.i = n; renderCard();
+  }
+
+  /* ---------- Prov: skapa ---------- */
+  function examPrompt(s) {
+    const n = s.count;
+    return `Skapa ett skriftligt prov i ämnet "${s.subject}" för elever på nivån "${s.course}", med exakt ${n} frågor.
+
+Regler:
+- Använd ENDAST innehållet i underlaget nedan. Täck så stor del av underlaget som möjligt.
+- Anpassa språk och svårighetsgrad till nivån ${s.course}.
+- Gör provet så likt ett riktigt skolprov som möjligt: en blandning av frågetyper och stigande svårighetsgrad (från grundläggande kunskap till resonemang och tillämpning).
+- Fördelning ungefär: 40 % "flerval" (4 alternativ, exakt ett rätt, rimliga felalternativ), 40 % "kort" (svar på 1–3 meningar, 2–3 poäng) och 20 % "lang" (utförligt resonerande svar, 4–6 poäng). Flerval ger 1 poäng.
+- Frågorna ska vara tydliga, entydiga och på svenska. Skriv aldrig svaret i frågan.
+- "topic" är ett kort ämnesområde (2–4 ord) som frågan testar.
+
+Svara ENBART med JSON, utan förklaringar eller markdown, i exakt detta format:
+{"questions":[
+ {"type":"flerval","topic":"...","question":"...","options":["...","...","...","..."],"correct":0,"points":1},
+ {"type":"kort","topic":"...","question":"...","points":2,"model_answer":"...","rubric":["viktig poäng 1","viktig poäng 2"]},
+ {"type":"lang","topic":"...","question":"...","points":5,"model_answer":"...","rubric":["..."]}
+]}
+"correct" är indexet (0–3) för rätt alternativ. Blanda ordningen så att rätt alternativ inte alltid är samma.
+
+<underlag>
+${s.material}
+</underlag>`;
+  }
+
+  async function startExam() {
+    const s = validSetup(); if (!s) return;
+    loading('Skapar ditt prov … det kan ta en minut.');
+    try {
+      const data = await withRetry(() => callClaude({
+        system: 'Du är en erfaren lärare som konstruerar rättvisa, tydliga prov. Du svarar bara med giltig JSON.',
+        messages: [{ role: 'user', content: examPrompt(s) }],
+        maxTokens: Math.min(30000, 4000 + s.count * 900),
+        json: true
+      }).then(parseJSON));
+      const qs = (data.questions || []).map((q, i) => {
+        const pts = Math.max(1, Math.round(Number(q.points) || 1));
+        const isMC = q.type === 'flerval' && Array.isArray(q.options) && q.options.length >= 2 &&
+                     Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.options.length;
+        return {
+          id: i + 1,
+          type: isMC ? 'flerval' : (q.type === 'lang' ? 'lang' : 'kort'),
+          topic: String(q.topic || s.subject),
+          question: String(q.question || ''),
+          options: isMC ? q.options.map(String) : null,
+          correct: isMC ? q.correct : null,
+          points: isMC ? 1 : pts,
+          model_answer: String(q.model_answer || ''),
+          rubric: Array.isArray(q.rubric) ? q.rubric.map(String) : []
+        };
+      }).filter((q) => q.question);
+      if (qs.length < 1) throw new Error('Inga frågor skapades. Försök igen.');
+      state.exam = { questions: qs, max: qs.reduce((a, q) => a + q.points, 0) };
+      state.answers = {};
+      renderExam();
+      show('exam');
+      state.limit = s.timer * 60;
+      state.t0 = Date.now();
+      runTimer();
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.message);
+    } finally { done(); }
+  }
+
+  /* ---------- Prov: visa ---------- */
+  function runTimer() {
+    clearInterval(state.timer);
+    const pill = $('#timerPill');
+    pill.hidden = !state.limit;                 // ingen klocka syns om du inte valt någon tid
+    if (!state.limit) return;
+    const tick = () => {
+      const left = Math.max(0, state.limit - Math.floor((Date.now() - state.t0) / 1000));
+      $('#timerVal').textContent = mmss(left);
+      pill.classList.toggle('low', left <= 60);
+      if (left === 0) {
+        clearInterval(state.timer);
+        toast('Tiden är slut. Provet lämnas in.');
+        submitExam(true);
+      }
+    };
+    tick(); state.timer = setInterval(tick, 1000);
+  }
+  function answeredCount() {
+    return state.exam.questions.filter((q) => {
+      const a = state.answers[q.id];
+      return q.type === 'flerval' ? Number.isInteger(a) : !!(a && a.trim());
+    }).length;
+  }
+  function updateProgress() {
+    const n = state.exam.questions.length;
+    const answered = answeredCount();
+    $('#progressFill').style.width = (answered / n * 100) + '%';
+    $('#progressText').textContent = 'Fråga ' + (state.cur + 1) + ' av ' + n + '. ' + answered + ' besvarade.';
+    document.querySelectorAll('#dots .dot').forEach((d, i) => {
+      const q = state.exam.questions[i], a = state.answers[q.id];
+      const has = q.type === 'flerval' ? Number.isInteger(a) : !!(a && a.trim());
+      d.classList.toggle('done', has);
+      d.classList.toggle('cur', i === state.cur);
+      d.setAttribute('aria-current', i === state.cur ? 'true' : 'false');
+    });
+  }
+
+  function renderExam() {
+    const { s, exam } = state;
+    $('#examTitle').textContent = s.subject;
+    $('#examSub').textContent = s.course + ', ' + exam.questions.length + ' frågor';
+    const dots = $('#dots'); dots.replaceChildren();
+    exam.questions.forEach((q, i) => dots.append(el('button', { type: 'button', class: 'dot', text: String(q.id), 'aria-label': 'Fråga ' + q.id, onclick: () => goQ(i) })));
+    goQ(0, true);
+  }
+
+  function goQ(i, first) {
+    const { exam } = state;
+    state.cur = i;
+    const q = exam.questions[i];
+    const area = $('#qArea'); area.replaceChildren();
+    area.append(
+      el('div', { class: 'qhead' }, el('span', { class: 'qnum', text: 'Fråga ' + q.id }), el('span', { class: 'pts', text: q.points + ' poäng' })),
+      el('p', { class: 'qtext', text: q.question })
+    );
+    if (q.type === 'flerval') {
+      const fs = el('fieldset', {}, el('legend', { text: 'Välj ett alternativ' }));
+      q.options.forEach((o, k) => {
+        const input = el('input', { type: 'radio', name: 'q' + q.id, value: String(k) });
+        if (state.answers[q.id] === k) input.checked = true;
+        input.addEventListener('change', () => { state.answers[q.id] = k; updateProgress(); });
+        fs.append(el('label', { class: 'opt' }, input, el('span', { class: 'letter', text: String.fromCharCode(65 + k) }), el('span', { text: o })));
+      });
+      area.append(fs);
+    } else {
+      const ta = el('textarea', { rows: q.type === 'lang' ? '9' : '5', 'aria-label': 'Svar på fråga ' + q.id, placeholder: 'Skriv ditt svar här …' });
+      ta.value = state.answers[q.id] || '';
+      ta.addEventListener('input', () => { state.answers[q.id] = ta.value; updateProgress(); });
+      area.append(ta);
+    }
+    const last = i === exam.questions.length - 1;
+    $('#prevBtn').disabled = i === 0;
+    $('#nextBtn').textContent = last ? 'Lämna in provet' : 'Nästa';
+    updateProgress();
+    if (!first) $('#examCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ---------- Prov: rätta ---------- */
+  const gradeFor = (pct) => { for (const [g, t] of LIMITS) if (pct >= t) return g; return 'F'; };
+
+  async function submitExam(auto) {
+    if (state.grading) return;
+    const { exam } = state;
+    const missing = exam.questions.length - answeredCount();
+    if (auto !== true && missing > 0 && !confirm('Du har ' + missing + ' obesvarade frågor. Vill du lämna in ändå? Du kan också gå tillbaka och svara först.')) return;
+    state.grading = true;
+    clearInterval(state.timer);
+    state.usedSec = Math.floor((Date.now() - state.t0) / 1000);
+    loading('Rättar ditt prov …');
+    try {
+      const items = exam.questions.map((q) => {
+        const a = state.answers[q.id];
+        if (q.type === 'flerval') {
+          return { id: q.id, type: 'flerval', topic: q.topic, question: q.question, points_max: 1,
+            student_answer: Number.isInteger(a) ? q.options[a] : '(obesvarad)',
+            correct_answer: q.options[q.correct], was_correct: a === q.correct };
+        }
+        return { id: q.id, type: q.type, topic: q.topic, question: q.question, points_max: q.points,
+          model_answer: q.model_answer, rubric: q.rubric, student_answer: (a && a.trim()) || '(obesvarad)' };
+      });
+
+      const prompt = `Du rättar ett prov i "${state.s.subject}" (${state.s.course}). Här är frågorna och elevens svar:
+
+${JSON.stringify(items, null, 1)}
+
+Uppgifter:
+1. Bedöm varje fråga av typen "kort" och "lang" mot bedömningsmallen. Ge heltalspoäng mellan 0 och points_max. Obesvarat ger 0. Var rättvis: ge poäng för sakligt riktiga delar även om formuleringen skiljer sig från modellsvaret, men inte för felaktiga påståenden. Flervalsfrågor är redan rättade – lämna dem utan resultat.
+2. Hitta vad eleven behöver träna mer på, utifrån ALLA frågor (även felaktiga flervalsfrågor). Max 5 punkter, viktigaste först. Om eleven klarade nästan allt: ge 1–2 finslipningsråd.
+3. Skriv ett kort helhetsomdöme (2–3 meningar), direkt till eleven ("du").
+
+Svara ENBART med JSON:
+{"results":[{"id":2,"points":1,"comment":"1–2 meningar om vad som var bra eller saknades"}],
+ "weak_topics":[{"topic":"...","advice":"konkret tips på vad eleven ska repetera"}],
+ "summary":"..."}`;
+
+      const data = await withRetry(() => callClaude({
+        system: 'Du är en rättvis och noggrann lärare som rättar prov. Du svarar bara med giltig JSON, på svenska.',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 16000,
+        json: true
+      }).then(parseJSON));
+      const byId = new Map((data.results || []).map((r) => [Number(r.id), r]));
+
+      let total = 0;
+      const review = exam.questions.map((q) => {
+        const a = state.answers[q.id];
+        let got, comment = '';
+        if (q.type === 'flerval') { got = a === q.correct ? 1 : 0; }
+        else {
+          const r = byId.get(q.id) || {};
+          got = Math.max(0, Math.min(q.points, Math.round(Number(r.points) || 0)));
+          comment = String(r.comment || '');
+        }
+        total += got;
+        return { q, got, comment, answer: a };
+      });
+      const pct = exam.max ? Math.round((total / exam.max) * 100) : 0;
+      renderResult({ total, pct, grade: gradeFor(pct), review,
+        weak: Array.isArray(data.weak_topics) ? data.weak_topics : [], summary: String(data.summary || '') });
+      show('result');
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.message);
+      state.limit = 0;                         // fortsätt klockan utan tidsgräns om rättningen misslyckades
+      runTimer();
+    } finally { done(); state.grading = false; }
+  }
+
+  /* ---------- Resultat ---------- */
+  function renderResult(r) {
+    const max = state.exam.max;
+    const color = r.grade === 'F' ? '#B83245' : (r.grade === 'D' || r.grade === 'E') ? '#B7791F' : '#1F6B57';
+    const C = 2 * Math.PI * 62;
+    $('#ring').innerHTML =
+      '<svg viewBox="0 0 156 156" width="156" height="156" aria-hidden="true">' +
+      '<circle cx="78" cy="78" r="62" fill="none" stroke="#E5EDEA" stroke-width="14"/>' +
+      '<circle cx="78" cy="78" r="62" fill="none" stroke="' + color + '" stroke-width="14" stroke-linecap="round" ' +
+      'stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - Math.min(100, r.pct) / 100)).toFixed(1) + '" transform="rotate(-90 78 78)"/>' +
+      '<text x="78" y="86" text-anchor="middle" font-size="54" font-weight="700" fill="' + color + '" font-family="DM Sans, system-ui, sans-serif">' + r.grade + '</text>' +
+      '<text x="78" y="110" text-anchor="middle" font-size="15" fill="#5F6F6A" font-family="DM Sans, system-ui, sans-serif">' + r.pct + ' %</text></svg>';
+    $('#scoreLine').textContent = 'Betyg ' + r.grade + ' – ' + r.total + ' av ' + max + ' poäng';
+    $('#summary').textContent = r.summary;
+
+    const stats = $('#stats'); stats.replaceChildren();
+    const full = r.review.filter((x) => x.got === x.q.points).length;
+    [['Poäng', r.total + ' / ' + max], ['Helt rätt', full + ' av ' + r.review.length + ' frågor'], ['Tid', mmss(state.usedSec || 0)]]
+      .forEach(([k, v]) => stats.append(el('div', { class: 'stat' }, el('span', { text: k }), el('strong', { text: v }))));
+
+    const lim = $('#limitsRow'); lim.replaceChildren();
+    LIMITS.slice().reverse().forEach(([g, t]) => lim.append(el('span', { class: 'chip' + (g === r.grade ? ' on' : ''), text: g + ' från ' + Math.ceil(max * t / 100) + ' p' })));
+
+    const weak = $('#weakList'); weak.replaceChildren();
+    if (!r.weak.length) weak.append(el('li', { text: 'Inga tydliga svaga punkter. Bra jobbat!' }));
+    r.weak.forEach((w) => weak.append(el('li', {}, el('strong', { text: String(w.topic || '') }), el('span', { text: String(w.advice || '') }))));
+    state.weak = r.weak.map((w) => '- ' + w.topic + (w.advice ? ': ' + w.advice : '')).join('\n');
+
+    const list = $('#reviewList'); list.replaceChildren();
+    r.review.forEach(({ q, got, comment, answer }) => {
+      const kind = got === q.points ? 'full' : got > 0 ? 'part' : 'none';
+      const yours = q.type === 'flerval' ? (Number.isInteger(answer) ? q.options[answer] : '(obesvarad)') : ((answer && answer.trim()) || '(obesvarad)');
+      const div = el('div', { class: 'review ' + kind },
+        el('div', { class: 'got', text: 'Fråga ' + q.id + ': ' + got + ' av ' + q.points + ' poäng' }),
+        el('p', { text: q.question }),
+        el('p', { text: 'Ditt svar: ' + yours })
+      );
+      if (q.type === 'flerval' && kind !== 'full') div.append(el('p', { class: 'model', text: 'Rätt svar: ' + q.options[q.correct] }));
+      if (q.type !== 'flerval') {
+        if (comment) div.append(el('p', { text: comment }));
+        if (q.model_answer) div.append(el('p', { class: 'model', text: 'Exempel på bra svar: ' + q.model_answer }));
+      }
+      list.append(div);
+    });
+    $('details').open = false;
+  }
+
+  /* ---------- API-nyckel-dialog ---------- */
+  function openKeyDialog() {
+    const rows = $('#keyRows'); rows.replaceChildren();
+    PROVIDERS.forEach((p) => {
+      const saved = !!store.get(p.store);
+      rows.append(el('div', { class: 'keyRow' },
+        el('label', { for: 'key-' + p.id, text: p.name + (saved ? ' ✓ sparad' : '') }),
+        el('span', { class: 'keyHint' }, 'Gratis nyckel på ', el('a', { href: p.link, target: '_blank', rel: 'noopener', text: p.linkText }), '. ' + p.hint),
+        el('input', { type: 'password', id: 'key-' + p.id, placeholder: saved ? '•••••••• (lämna tomt för att behålla)' : p.ph, autocomplete: 'off', 'aria-label': 'API-nyckel för ' + p.name })
+      ));
+    });
+    $('#keyDialog').showModal();
+  }
+
+  /* ---------- Händelser ---------- */
+  function goHome() {
+    if (!$('#view-exam').hidden && !confirm('Provet är inte inlämnat. Vill du lämna det?')) return;
+    clearInterval(state.timer);
+    show('home');
+  }
+  $('#homeLink').addEventListener('click', (e) => { e.preventDefault(); goHome(); });
+  $('#studyExit').addEventListener('click', () => show('home'));
+  $('#homeFromResultBtn').addEventListener('click', () => show('home'));
+  $('#retryBtn').addEventListener('click', startExam);
+  $('#studyFromResultBtn').addEventListener('click', () => startStudy(state.weak));
+  $('#studyBtn').addEventListener('click', () => startStudy(''));
+  $('#examBtn').addEventListener('click', startExam);
+  $('#prevBtn').addEventListener('click', () => { if (state.cur > 0) goQ(state.cur - 1); });
+  $('#nextBtn').addEventListener('click', () => {
+    if (state.cur < state.exam.questions.length - 1) goQ(state.cur + 1); else submitExam(false);
+  });
+  $('#cancelBtn').addEventListener('click', () => { if (state.abort) state.abort.abort(); done(); state.grading = false; });
+
+  $('#keyBtn').addEventListener('click', openKeyDialog);
+  $('#keyClose').addEventListener('click', () => $('#keyDialog').close());
+  $('#keyRemove').addEventListener('click', () => { PROVIDERS.forEach((p) => store.del(p.store)); $('#keyDialog').close(); toast('API-nycklarna är borttagna.'); });
+  $('#keySave').addEventListener('click', () => {
+    let n = 0;
+    PROVIDERS.forEach((p) => {
+      const k = $('#key-' + p.id).value.trim();
+      if (k) { store.set(p.store, k); delete cool[p.id]; n++; }
+    });
+    if (!n) return;
+    $('#keyDialog').close(); toast('API-nycklarna är sparade.');
+  });
+
+  $('#level').addEventListener('change', () => { fillGrades(); refreshHome(); saveSetup(); });
+  for (const id of ['subject', 'grade', 'timer', 'count', 'material']) {
+    $('#' + id).addEventListener('input', () => { refreshHome(); saveSetup(); });
+  }
+
+  $('#chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-say]'); if (!b || $('#chatInput').disabled) return;
+    state.chat.push({ role: 'user', content: b.dataset.say });
+    addMsg('user', b.dataset.say); sendChat();
+  });
+  $('#chatForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = $('#chatInput').value.trim();
+    if (!t || $('#chatInput').disabled) return;
+    $('#chatInput').value = '';
+    state.chat.push({ role: 'user', content: t });
+    addMsg('user', t); sendChat();
+  });
+  $('#chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#chatForm').requestSubmit(); }
+  });
+
+  $('#modeTabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode);
+  });
+  $('#fcard').addEventListener('click', flipCard);
+  $('#fcard').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); }
+  });
+  $('#fcPrev').addEventListener('click', () => stepCard(-1));
+  $('#fcNext').addEventListener('click', () => stepCard(1));
+  $('#fcNew').addEventListener('click', makeCards);
+  document.addEventListener('keydown', (e) => {
+    if ($('#view-study').hidden || $('#cardsPane').hidden || e.target.closest('input, textarea, select')) return;
+    if (e.key === 'ArrowRight') stepCard(1);
+    else if (e.key === 'ArrowLeft') stepCard(-1);
+  });
+
+  /* ---------- Start ---------- */
+  try {
+    const saved = JSON.parse(store.get('plugga.setup') || 'null');
+    if (saved) {
+      $('#subject').value = saved.subject || '';
+      if (saved.level && LEVELS[saved.level]) { $('#level').value = saved.level; fillGrades(saved.grade); }
+      if (saved.timer) $('#timer').value = saved.timer;
+      if (saved.count) $('#count').value = String(saved.count);
+      $('#material').value = saved.material || '';
+    }
+  } catch { /* ignore */ }
+  refreshHome();
+})();
+</script>
+</body>
+</html>
