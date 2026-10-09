@@ -415,7 +415,10 @@
       link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com/api-keys', hint: 'Använd den gratis "Trial"-nyckeln.', ph: 'Din Cohere-nyckel' },
     { id: 'sambanova',  name: 'SambaNova',     store: 'plugga.key.sambanova',  models: ['Meta-Llama-3.3-70B-Instruct', 'gpt-oss-120b', 'Meta-Llama-3.1-8B-Instruct'],
       url: 'https://api.sambanova.ai/v1/chat/completions', noJsonMode: true,
-      link: 'https://cloud.sambanova.ai/apis', linkText: 'cloud.sambanova.ai/apis', hint: 'Skapa ett konto och en API-nyckel.', ph: 'Din SambaNova-nyckel' }
+      link: 'https://cloud.sambanova.ai/apis', linkText: 'cloud.sambanova.ai/apis', hint: 'Skapa ett konto och en API-nyckel.', ph: 'Din SambaNova-nyckel' },
+    { id: 'cloudflare', name: 'Cloudflare Workers AI', store: 'plugga.key.cloudflare', models: ['@cf/meta/llama-3.1-8b-instruct', '@cf/openai/gpt-oss-120b'],
+      url: 'https://api.cloudflare.com/client/v4/accounts/', cloudflare: true,
+      link: 'https://dash.cloudflare.com/', linkText: 'dash.cloudflare.com', hint: 'Klistra in Account ID och API-token som: AccountID|API-token.', ph: 'AccountID|API-token' }
   ];
   const cool = {};   // tjänst-id -> tidpunkt då den får användas igen (efter att gratisgränsen nåtts)
   const hasKey = () => PROVIDERS.some((p) => store.get(p.store));
@@ -497,9 +500,9 @@
           headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
           body: makeGeminiBody(model)
         })
-      : fetch(p.url, {
+      : fetch(p.cloudflare ? p.url + key.split('|')[0] + '/ai/v1/chat/completions' : p.url, {
           method: 'POST', signal,
-          headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + key },
+          headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + (p.cloudflare ? key.split('|')[1] : key) },
           body: makeChatBody(p, model)
         }));
     const wait = (ms) => new Promise((resolve, reject) => {
