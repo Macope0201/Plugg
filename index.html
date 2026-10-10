@@ -392,7 +392,21 @@
   const retryErr = (m) => Object.assign(new Error(m), { retry: true });
   const MAX_WORDS = 20000;
   const MIN_WORDS = 30;
-  const LIMITS = [['A', 90], ['B', 80], ['C', 70], ['D', 60], ['E', 50]]; // % av max poäng
+
+  /* ---------- Betygssystem (Kunskapsskolan) ----------
+     Årskurs 4–5:  EG / G / MG / AG
+     Övriga nivåer (årskurs 6–9, gymnasiet, högskola): F–A
+     Gränserna anges som procent av max poäng. */
+  const LIMITS = [['A', 90], ['B', 80], ['C', 70], ['D', 60], ['E', 50]];                       // F–A (under 50 % = F)
+  // Baserat på ett riktigt Historieprov i åk 5 (max 36 p): G från 16 p, MG från 21 p, AG från 27 p
+  const LIMITS_LOW = [['AG', 27 / 36 * 100], ['MG', 21 / 36 * 100], ['G', 16 / 36 * 100]];     // åk 4–5 (under G = EG)
+  const LOW_GRADES = ['Årskurs 4', 'Årskurs 5'];
+  const scaleFor = (s) => (s && s.level === 'grundskola' && LOW_GRADES.includes(s.grade))
+    ? { limits: LIMITS_LOW, fail: 'EG' }
+    : { limits: LIMITS, fail: 'F' };
+  // Antal poäng som krävs för en gräns (litet avdrag för att undvika avrundningsfel)
+  const pointsNeeded = (max, t) => Math.ceil(max * t / 100 - 1e-9);
+
   const LEVELS = {
     grundskola:  { label: 'Grundskola', grades: ['Årskurs 4', 'Årskurs 5', 'Årskurs 6', 'Årskurs 7', 'Årskurs 8', 'Årskurs 9'] },
     gymnasiet:   { label: 'Gymnasiet', grades: ['Årskurs 1', 'Årskurs 2', 'Årskurs 3'] },
@@ -576,7 +590,7 @@
           if (res.status === 404) { if (p.id === 'gemini' && i === modelIdx) modelIdx = i + 1; continue; }   // modellen finns inte längre
           if (res.status === 429) { limited = true; provLimited = true; continue; }                          // gränsen nådd: prova nästa modell
           if ([500, 502, 503, 504, 529].includes(res.status)) { overloaded = true; continue; }               // överbelastad: prova nästa modell
-          if (res.status === 402) { limited = true; provLimited = true; break; }                              // slut på tegodo: nästa tjänst
+          if (res.status === 402) { limited = true; provLimited = true; break; }                              // slut på krediter: nästa tjänst
           lastErr = 'Något gick fel hos AI:n (' + res.status + '). ' + detail;                                // annat fel: prova nästa modell/tjänst
         }
         if (provLimited) cool[p.id] = Date.now() + 60000;   // vila tjänsten i en minut
@@ -932,7 +946,12 @@ ${s.material}
   }
 
   /* ---------- Prov: rätta ---------- */
-  const gradeFor = (pct) => { for (const [g, t] of LIMITS) if (pct >= t) return g; return 'F'; };
+  // Betyget räknas på poäng (inte avrundad procent), så att t.ex. exakt 16 av 36 poäng ger G
+  const gradeFor = (total, max) => {
+    const sc = scaleFor(state.s);
+    for (const [g, t] of sc.limits) if (total >= pointsNeeded(max, t)) return g;
+    return sc.fail;
+  };
 
   async function submitExam(auto) {
     if (state.grading) return;
@@ -991,7 +1010,7 @@ Svara ENBART med JSON:
         return { q, got, comment, answer: a };
       });
       const pct = exam.max ? Math.round((total / exam.max) * 100) : 0;
-      renderResult({ total, pct, grade: gradeFor(pct), review,
+      renderResult({ total, pct, grade: gradeFor(total, exam.max), review,
         weak: Array.isArray(data.weak_topics) ? data.weak_topics : [], summary: String(data.summary || '') });
       show('result');
     } catch (e) {
@@ -1004,14 +1023,17 @@ Svara ENBART med JSON:
   /* ---------- Resultat ---------- */
   function renderResult(r) {
     const max = state.exam.max;
-    const color = r.grade === 'F' ? '#B83245' : (r.grade === 'D' || r.grade === 'E') ? '#B7791F' : '#1F6B57';
+    const sc = scaleFor(state.s);
+    const color = (r.grade === 'F' || r.grade === 'EG') ? '#B83245'
+      : ['D', 'E', 'G'].includes(r.grade) ? '#B7791F' : '#1F6B57';
+    const gradeSize = r.grade.length > 1 ? 40 : 54;      // två bokstäver (EG, MG, AG) ryms inte i storlek 54
     const C = 2 * Math.PI * 62;
     $('#ring').innerHTML =
       '<svg viewBox="0 0 156 156" width="156" height="156" aria-hidden="true">' +
       '<circle cx="78" cy="78" r="62" fill="none" stroke="#E5EDEA" stroke-width="14"/>' +
       '<circle cx="78" cy="78" r="62" fill="none" stroke="' + color + '" stroke-width="14" stroke-linecap="round" ' +
       'stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - Math.min(100, r.pct) / 100)).toFixed(1) + '" transform="rotate(-90 78 78)"/>' +
-      '<text x="78" y="86" text-anchor="middle" font-size="54" font-weight="700" fill="' + color + '" font-family="DM Sans, system-ui, sans-serif">' + r.grade + '</text>' +
+      '<text x="78" y="' + (gradeSize === 54 ? 86 : 82) + '" text-anchor="middle" font-size="' + gradeSize + '" font-weight="700" fill="' + color + '" font-family="DM Sans, system-ui, sans-serif">' + r.grade + '</text>' +
       '<text x="78" y="110" text-anchor="middle" font-size="15" fill="#5F6F6A" font-family="DM Sans, system-ui, sans-serif">' + r.pct + ' %</text></svg>';
     $('#scoreLine').textContent = 'Betyg ' + r.grade + ' – ' + r.total + ' av ' + max + ' poäng';
     $('#summary').textContent = r.summary;
@@ -1021,8 +1043,11 @@ Svara ENBART med JSON:
     [['Poäng', r.total + ' / ' + max], ['Helt rätt', full + ' av ' + r.review.length + ' frågor'], ['Tid', mmss(state.usedSec || 0)]]
       .forEach(([k, v]) => stats.append(el('div', { class: 'stat' }, el('span', { text: k }), el('strong', { text: v }))));
 
+    // Betygsgränser: lägsta betyget först (t.ex. EG, G, MG, AG eller F, E, D, C, B, A)
     const lim = $('#limitsRow'); lim.replaceChildren();
-    LIMITS.slice().reverse().forEach(([g, t]) => lim.append(el('span', { class: 'chip' + (g === r.grade ? ' on' : ''), text: g + ' från ' + Math.ceil(max * t / 100) + ' p' })));
+    const lowest = sc.limits[sc.limits.length - 1];
+    lim.append(el('span', { class: 'chip' + (r.grade === sc.fail ? ' on' : ''), text: sc.fail + ' under ' + pointsNeeded(max, lowest[1]) + ' p' }));
+    sc.limits.slice().reverse().forEach(([g, t]) => lim.append(el('span', { class: 'chip' + (g === r.grade ? ' on' : ''), text: g + ' från ' + pointsNeeded(max, t) + ' p' })));
 
     const weak = $('#weakList'); weak.replaceChildren();
     if (!r.weak.length) weak.append(el('li', { text: 'Inga tydliga svaga punkter. Bra jobbat!' }));
