@@ -98,11 +98,15 @@
   /* Plugga text */
   .textHelp { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
   #textSrc { min-height: 200px; }
-  .ovRow { display: grid; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
-  .ovBg, .ovTa { grid-area: 1 / 1; align-self: start; font: inherit; font-size: 17px; line-height: 1.6; padding: 6px 8px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .textTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .textTop .textHelp { margin: 0; flex: 1 1 240px; }
+  .ovRow { display: grid; margin-bottom: 12px; background: var(--field); border: 1px solid var(--border); border-radius: 12px; }
+  .ovRow:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,107,87,.18); }
+  .ovBg, .ovTa { grid-area: 1 / 1; align-self: start; font: inherit; line-height: 1.55; padding: 12px 15px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
   .ovBg { color: #A7B6B0; pointer-events: none; user-select: none; }
-  .ovTa { width: 100%; height: auto; background: transparent; border: 0; border-radius: 8px; color: var(--ink); resize: none; overflow: hidden; }
-  .ovTa:focus { box-shadow: none; background: rgba(31,107,87,.06); }
+  .hideSv .ovBg { visibility: hidden; }
+  .ovTa { width: 100%; height: auto; background: transparent; border: 0; border-radius: 12px; color: var(--ink); resize: none; overflow: hidden; }
+  .ovTa:focus { box-shadow: none; background: transparent; }
 
   /* Prov */
   .examTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
@@ -310,13 +314,16 @@
       <div id="textStep1">
         <label for="textSrc">Klistra in din text</label>
         <p class="textHelp" id="textHelp1"></p>
-        <textarea id="textSrc" spellcheck="false" placeholder="Klistra in din text på svenska här…"></textarea>
+        <textarea id="textSrc" spellcheck="false" placeholder="Klistra in din text här (vilket språk som helst)…"></textarea>
         <div class="actions" style="margin-top:16px">
           <button type="button" class="primary" id="textGo" disabled>Börja skriva</button>
         </div>
       </div>
       <div id="textStep2" hidden>
-        <p class="textHelp" id="textHelp2"></p>
+        <div class="textTop">
+          <p class="textHelp" id="textHelp2"></p>
+          <button type="button" class="small" id="textToggle" aria-pressed="false">Stäng av svenska texten</button>
+        </div>
         <div id="textBlocks"></div>
         <div class="actions" style="margin-top:20px">
           <button type="button" id="textReset">Börja om</button>
@@ -872,24 +879,56 @@ ${s.material}
     $('#textBlocks').replaceChildren();
     $('#textStep1').hidden = false; $('#textStep2').hidden = true;
     $('#textGo').disabled = true;
-    $('#textHelp1').textContent = 'Klistra in en text på svenska. Sedan skriver du den ' + onLang() + ', direkt ovanpå den svenska texten som syns svagt (genomskinligt) bakom.';
+    $('#textBlocks').classList.remove('hideSv');
+    $('#textToggle').textContent = 'Stäng av svenska texten'; $('#textToggle').setAttribute('aria-pressed', 'false');
+    $('#textHelp1').textContent = 'Klistra in en text på vilket språk du vill. Den översätts automatiskt till svenska och syns svagt bakom när du skriver. Du skriver den sedan ' + onLang() + '.';
   }
 
-  function startTextWork() {
+  function transPrompt(chunk) {
+    return `Översätt varje mening nedan till svenska. Om en mening redan är på svenska lämnar du den oförändrad. Behåll innebörden och översätt mening för mening, utan att slå ihop eller dela upp meningar.
+
+Svara ENBART med JSON, utan förklaringar eller markdown, i exakt detta format, med lika många översättningar som meningar och i samma ordning:
+{"translations":["...","..."]}
+
+<meningar>
+${JSON.stringify(chunk)}
+</meningar>`;
+  }
+
+  async function startTextWork() {
     const raw = $('#textSrc').value.trim();
     if (!raw) return;
     const parts = raw.split(/\n+|(?<=[.!?…])\s+(?=[A-ZÅÄÖ¿¡"“0-9])/).map((x) => x.trim()).filter(Boolean);
-    const box = $('#textBlocks'); box.replaceChildren();
-    parts.forEach((t) => {
-      const bg = el('div', { class: 'ovBg', text: t, 'aria-hidden': 'true' });
-      const ta = el('textarea', { class: 'ovTa', rows: '1', spellcheck: 'false', 'aria-label': 'Skriv ' + onLang() + ': ' + t });
-      ta.addEventListener('input', () => fitOv(ta));
-      box.append(el('div', { class: 'ovRow' }, bg, ta));
-    });
-    $('#textHelp2').textContent = 'Skriv varje mening ' + onLang() + ' ovanpå den svaga svenska texten.';
-    $('#textStep1').hidden = true; $('#textStep2').hidden = false;
-    fitAllOv();
-    const first = box.querySelector('.ovTa'); if (first) first.focus({ preventScroll: true });
+    loading('Översätter till svenska …');
+    try {
+      const sv = [], CH = 25;                    // översätt i omgångar om texten är lång
+      for (let i = 0; i < parts.length; i += CH) {
+        const chunk = parts.slice(i, i + CH);
+        if (parts.length > CH) $('#loadingText').textContent = 'Översätter till svenska … (' + Math.min(i + CH, parts.length) + ' av ' + parts.length + ' meningar)';
+        const data = await withRetry(() => callClaude({
+          system: 'Du är en noggrann översättare. Du svarar bara med giltig JSON.',
+          messages: [{ role: 'user', content: transPrompt(chunk) }],
+          maxTokens: 8000,
+          json: true
+        }).then(parseJSON));
+        const arr = Array.isArray(data.translations) ? data.translations : [];
+        chunk.forEach((orig, k) => sv.push(String(arr[k] || '').trim() || orig));   // saknas en översättning visas originalet
+      }
+      const box = $('#textBlocks'); box.replaceChildren(); box.classList.remove('hideSv');
+      $('#textToggle').textContent = 'Stäng av svenska texten'; $('#textToggle').setAttribute('aria-pressed', 'false');
+      parts.forEach((t, i) => {
+        const bg = el('div', { class: 'ovBg', text: sv[i], 'aria-hidden': 'true' });
+        const ta = el('textarea', { class: 'ovTa', rows: '1', spellcheck: 'false', 'aria-label': 'Skriv ' + onLang() + ': ' + sv[i] });
+        ta.addEventListener('input', () => fitOv(ta));
+        box.append(el('div', { class: 'ovRow' }, bg, ta));
+      });
+      $('#textHelp2').textContent = 'Skriv varje mening ' + onLang() + ' ovanpå den svaga svenska översättningen.';
+      $('#textStep1').hidden = true; $('#textStep2').hidden = false;
+      fitAllOv();
+      const first = box.querySelector('.ovTa'); if (first) first.focus({ preventScroll: true });
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.message);
+    } finally { done(); }
   }
 
   /* ---------- Prov: skapa ---------- */
@@ -1287,6 +1326,11 @@ Svara ENBART med JSON:
   });
   $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); });
   $('#textGo').addEventListener('click', startTextWork);
+  $('#textToggle').addEventListener('click', () => {
+    const off = $('#textBlocks').classList.toggle('hideSv');
+    $('#textToggle').textContent = off ? 'Slå på svenska texten' : 'Stäng av svenska texten';
+    $('#textToggle').setAttribute('aria-pressed', off ? 'true' : 'false');
+  });
   $('#textReset').addEventListener('click', () => {
     const typed = [...document.querySelectorAll('#textBlocks .ovTa')].some((t) => t.value.trim());
     if (typed && !confirm('Vill du börja om? Det du har skrivit försvinner.')) return;
