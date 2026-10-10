@@ -97,7 +97,7 @@
 
   /* Plugga text */
   .textHelp { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
-  #textSrc { height: calc(1.55em + 26px); line-height: 1.55; resize: none; max-height: 60vh; overflow-y: auto; }
+  #textSrc { height: 190px; min-height: 90px; line-height: 1.55; resize: vertical; overflow-y: auto; }   /* större från början, och du kan dra i hörnet för att ändra höjden */
   .textTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .textTop .textHelp { margin: 0; flex: 1 1 240px; }
   .textBtns { display: flex; flex-direction: column; gap: 8px; }
@@ -884,12 +884,6 @@ ${s.material}
       : (orig ? (name ? 'Stäng av ' + name + ' texten' : 'Stäng av originaltexten') : 'Stäng av svenska texten');
     $('#textToggle').setAttribute('aria-pressed', tx.off ? 'true' : 'false');
   }
-  function fitSrc() {                           // klistra-in-rutan växer som meningsrutorna
-    const ta = $('#textSrc');
-    if (!ta.offsetParent) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight + 2, window.innerHeight * 0.6) + 'px';
-  }
   function fitAllOv() { document.querySelectorAll('#textBlocks .ovTa').forEach(fitOv); }
 
   function resetText() {
@@ -1344,7 +1338,7 @@ Svara ENBART med JSON:
   $('#modeTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode);
   });
-  $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); fitSrc(); });
+  $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); });
   $('#textGo').addEventListener('click', startTextWork);
   $('#textToggle').addEventListener('click', () => { tx.off = !tx.off; updateHintUi(); });
   $('#textLang').addEventListener('click', () => { tx.mode = tx.mode === 'sv' ? 'orig' : 'sv'; updateHintUi(); });
