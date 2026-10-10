@@ -127,6 +127,11 @@
   .examNav button { min-width: 150px; }
   .examNav button:disabled { background: transparent; color: var(--green-off); border-color: var(--border); }
 
+  /* Tips */
+  .examTools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .tipsBtn { height: 34px; padding: 0 14px; font-size: 14.5px; border-radius: 99px; }
+  .hintBox { margin: 14px 0 0; padding: 12px 16px; background: #FBF1DD; color: #6B4710; border-radius: 14px; font-size: 15px; line-height: 1.5; }
+
   /* Resultat */
   .resultTop { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; margin-bottom: 26px; }
   .ring { width: 156px; height: 156px; flex: none; }
@@ -301,13 +306,17 @@
           <p class="examTitle" id="examTitle"></p>
           <p class="examSub" id="examSub"></p>
         </div>
+        <div class="examTools">
         <div class="timerPill" id="timerPill" hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>
           <span>Tid kvar</span> <span id="timerVal">00:00</span>
         </div>
+        <button type="button" class="tipsBtn" id="tipsBtn">Tips</button>
+        </div>
       </div>
       <div class="progressBar" aria-hidden="true"><span id="progressFill"></span></div>
       <p class="progressText" id="progressText"></p>
+      <p class="hintBox" id="hintBox" role="status" hidden></p>
 
       <div id="qArea"></div>
 
@@ -941,8 +950,58 @@ ${s.material}
     const last = i === exam.questions.length - 1;
     $('#prevBtn').disabled = i === 0;
     $('#nextBtn').textContent = last ? 'Lämna in provet' : 'Nästa';
+    showHint();
     updateProgress();
     if (!first) $('#examCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ---------- Prov: tips ---------- */
+  function showHint() {
+    const q = state.exam && state.exam.questions[state.cur];
+    const box = $('#hintBox');
+    if (q && q.hint) { box.textContent = q.hint; box.hidden = false; }
+    else { box.textContent = ''; box.hidden = true; }
+  }
+
+  async function getHint() {
+    const { s, exam } = state;
+    if (!exam) return;
+    const q = exam.questions[state.cur];
+    if (q.hint) { showHint(); return; }
+    const box = $('#hintBox'), btn = $('#tipsBtn');
+    btn.disabled = true;
+    box.textContent = 'Letar efter en ledtråd …'; box.hidden = false;
+    try {
+      const facit = q.type === 'flerval' ? q.options[q.correct] : q.model_answer;
+      const alt = q.type === 'flerval' ? '\nAlternativ:\n' + q.options.map((o, k) => String.fromCharCode(65 + k) + ') ' + o).join('\n') : '';
+      const prompt = `Du hjälper en elev som sitter med ett prov i "${s.subject}" (${s.course}). Eleven har bett om ett tips till frågan nedan.
+
+Fråga: ${q.question}${alt}
+
+Hemligt facit (får ALDRIG avslöjas, varken direkt eller indirekt): ${facit}
+
+Regler:
+- Skriv en kort ledtråd på 1–2 meningar, på svenska, anpassad till nivån.
+- Avslöja inte svaret. Nämn inte heller något nyckelbegrepp, namn, årtal eller ord som står i facit.
+- Vid flervalsfråga: peka inte ut och stryk inget alternativ, och nämn inga bokstäver.
+- Hjälp eleven att komma på det själv, till exempel genom att peka på vad frågan egentligen handlar om, vilken del av ämnet eleven ska tänka på, eller ställ en vägledande motfråga.
+- Svara bara med ledtråden, utan rubrik.
+
+<material>
+${s.material}
+</material>`;
+      const reply = await callClaude({
+        system: 'Du är en vänlig lärare som ger små ledtrådar utan att avslöja svaret.',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 600
+      });
+      q.hint = reply.trim();
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.message);
+    } finally {
+      btn.disabled = false;
+      showHint();                              // visar tipset för den fråga man är på nu (eller döljer rutan)
+    }
   }
 
   /* ---------- Prov: rätta ---------- */
@@ -1101,6 +1160,7 @@ Svara ENBART med JSON:
   $('#studyBtn').addEventListener('click', () => startStudy(''));
   $('#examBtn').addEventListener('click', startExam);
   $('#prevBtn').addEventListener('click', () => { if (state.cur > 0) goQ(state.cur - 1); });
+  $('#tipsBtn').addEventListener('click', getHint);
   $('#nextBtn').addEventListener('click', () => {
     if (state.cur < state.exam.questions.length - 1) goQ(state.cur + 1); else submitExam(false);
   });
