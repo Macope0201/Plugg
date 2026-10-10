@@ -100,13 +100,11 @@
   #textSrc { height: calc(1.55em + 26px); line-height: 1.55; resize: none; max-height: 60vh; overflow-y: auto; }
   .textTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .textTop .textHelp { margin: 0; flex: 1 1 240px; }
-  .ovRow { display: grid; margin-bottom: 12px; background: var(--field); border: 1px solid var(--border); border-radius: 12px; }
-  .ovRow:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,107,87,.18); }
-  .ovBg, .ovTa { grid-area: 1 / 1; align-self: start; font: inherit; line-height: 1.55; padding: 12px 15px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .ovBg { color: #A7B6B0; pointer-events: none; user-select: none; }
-  .hideSv .ovBg { visibility: hidden; }
-  .ovTa { width: 100%; height: auto; background: transparent; border: 0; border-radius: 12px; color: var(--ink); resize: none; overflow: hidden; }
-  .ovTa:focus { box-shadow: none; background: transparent; }
+  .textBtns { display: flex; flex-direction: column; gap: 8px; }
+  .ovRow { margin-bottom: 14px; }
+  .ovHint { margin: 0 0 6px 2px; font-size: 14.5px; line-height: 1.4; color: #7B8A85; overflow-wrap: anywhere; }
+  .hideSv .ovHint { display: none; }
+  .ovTa { height: calc(1.55em + 26px); line-height: 1.55; resize: none; overflow: hidden; }
 
   /* Prov */
   .examTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
@@ -321,7 +319,10 @@
       <div id="textStep2" hidden>
         <div class="textTop">
           <p class="textHelp" id="textHelp2"></p>
-          <button type="button" class="small" id="textToggle" aria-pressed="false">Stäng av svenska texten</button>
+          <div class="textBtns">
+            <button type="button" class="small" id="textLang">Visa på spanska</button>
+            <button type="button" class="small" id="textToggle" aria-pressed="false">Stäng av svenska texten</button>
+          </div>
         </div>
         <div id="textBlocks"></div>
         <div class="actions" style="margin-top:20px">
@@ -484,7 +485,7 @@
 
   const $ = (s) => document.querySelector(s);
   const fc = { cards: null, i: 0, focus: '' };   // flashcards i pluggläget
-  const tx = { lang: null };                     // 'Plugga text': språket (null = fliken visas inte)
+  const tx = { lang: null, mode: 'sv', off: false, sv: [], orig: [] };                     // 'Plugga text': språket (null = fliken visas inte)
   const state = { s: null, exam: null, answers: {}, chat: [], weak: '', abort: null, timer: null, t0: 0, limit: 0, grading: false, cur: 0, usedSec: 0 };
 
   /* ---------- Hjälpfunktioner ---------- */
@@ -866,10 +867,22 @@ ${s.material}
   }
   const onLang = () => 'på ' + ((tx.lang && tx.lang.name) || 'språket du pluggar');
 
-  function fitOv(ta) {                          // textrutan växer så att den täcker både din text och den svenska bakom
-    const bg = ta.previousElementSibling;
+  function fitOv(ta) {                          // textrutan växer när du skriver
+    if (!ta.offsetParent) return;
     ta.style.height = 'auto';
-    ta.style.height = Math.max(ta.scrollHeight, bg.offsetHeight) + 'px';
+    ta.style.height = (ta.scrollHeight + 2) + 'px';
+  }
+  // Hjälptexten ovanför varje ruta: svenska översättningen eller originaltexten. Knapparna uppdateras med.
+  function updateHintUi() {
+    const orig = tx.mode === 'orig';
+    const name = tx.lang && tx.lang.name;
+    document.querySelectorAll('#textBlocks .ovHint').forEach((h, i) => { h.textContent = orig ? tx.orig[i] : tx.sv[i]; });
+    $('#textBlocks').classList.toggle('hideSv', tx.off);
+    $('#textLang').textContent = orig ? 'Visa på svenska' : (name ? 'Visa på ' + name : 'Visa originaltexten');
+    $('#textLang').disabled = tx.off;
+    $('#textToggle').textContent = tx.off ? 'Slå på texten'
+      : (orig ? (name ? 'Stäng av ' + name + ' texten' : 'Stäng av originaltexten') : 'Stäng av svenska texten');
+    $('#textToggle').setAttribute('aria-pressed', tx.off ? 'true' : 'false');
   }
   function fitSrc() {                           // klistra-in-rutan växer som meningsrutorna
     const ta = $('#textSrc');
@@ -884,8 +897,8 @@ ${s.material}
     $('#textBlocks').replaceChildren();
     $('#textStep1').hidden = false; $('#textStep2').hidden = true;
     $('#textGo').disabled = true;
-    $('#textBlocks').classList.remove('hideSv');
-    $('#textToggle').textContent = 'Stäng av svenska texten'; $('#textToggle').setAttribute('aria-pressed', 'false');
+    tx.mode = 'sv'; tx.off = false; tx.sv = []; tx.orig = [];
+    updateHintUi();
     $('#textSrc').style.height = '';
     $('#textLabel').textContent = 'Klistra in din ' + ((tx.lang && tx.lang.name) ? tx.lang.name + ' ' : '') + 'text';
   }
@@ -920,15 +933,16 @@ ${JSON.stringify(chunk)}
         const arr = Array.isArray(data.translations) ? data.translations : [];
         chunk.forEach((orig, k) => sv.push(String(arr[k] || '').trim() || orig));   // saknas en översättning visas originalet
       }
-      const box = $('#textBlocks'); box.replaceChildren(); box.classList.remove('hideSv');
-      $('#textToggle').textContent = 'Stäng av svenska texten'; $('#textToggle').setAttribute('aria-pressed', 'false');
+      const box = $('#textBlocks'); box.replaceChildren();
+      tx.orig = parts; tx.sv = sv; tx.mode = 'sv'; tx.off = false;
       parts.forEach((t, i) => {
-        const bg = el('div', { class: 'ovBg', text: sv[i], 'aria-hidden': 'true' });
-        const ta = el('textarea', { class: 'ovTa', rows: '1', spellcheck: 'false', 'aria-label': 'Skriv ' + onLang() + ': ' + sv[i] });
+        const hint = el('div', { class: 'ovHint', id: 'ovHint' + i });
+        const ta = el('textarea', { class: 'ovTa', rows: '1', spellcheck: 'false', 'aria-describedby': 'ovHint' + i, 'aria-label': 'Skriv ' + onLang() + ', mening ' + (i + 1) });
         ta.addEventListener('input', () => fitOv(ta));
-        box.append(el('div', { class: 'ovRow' }, bg, ta));
+        box.append(el('div', { class: 'ovRow' }, hint, ta));
       });
-      $('#textHelp2').textContent = 'Skriv varje mening ' + onLang() + ' ovanpå den svaga svenska översättningen.';
+      updateHintUi();
+      $('#textHelp2').textContent = 'Skriv varje mening ' + onLang() + ' i rutan under hjälptexten.';
       $('#textStep1').hidden = true; $('#textStep2').hidden = false;
       fitAllOv();
       const first = box.querySelector('.ovTa'); if (first) first.focus({ preventScroll: true });
@@ -1332,11 +1346,8 @@ Svara ENBART med JSON:
   });
   $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); fitSrc(); });
   $('#textGo').addEventListener('click', startTextWork);
-  $('#textToggle').addEventListener('click', () => {
-    const off = $('#textBlocks').classList.toggle('hideSv');
-    $('#textToggle').textContent = off ? 'Slå på svenska texten' : 'Stäng av svenska texten';
-    $('#textToggle').setAttribute('aria-pressed', off ? 'true' : 'false');
-  });
+  $('#textToggle').addEventListener('click', () => { tx.off = !tx.off; updateHintUi(); });
+  $('#textLang').addEventListener('click', () => { tx.mode = tx.mode === 'sv' ? 'orig' : 'sv'; updateHintUi(); });
   $('#textReset').addEventListener('click', () => {
     const typed = [...document.querySelectorAll('#textBlocks .ovTa')].some((t) => t.value.trim());
     if (typed && !confirm('Vill du börja om? Det du har skrivit försvinner.')) return;
