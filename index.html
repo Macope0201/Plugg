@@ -708,6 +708,9 @@
 
   /* ---------- Plugga-läge ---------- */
   function studySystem(s) {
+    const prov = state.studyReport
+      ? '\n\nEleven har precis gjort ett prov i ämnet. Så gick det. Använd detta för att ge träffsäker hjälp: hänvisa till specifika frågor och fel, förklara det eleven missade och prata om resultatet på ett uppmuntrande sätt.\n<provresultat>\n' + state.studyReport + '\n</provresultat>'
+      : '';
     return `Du är en tålmodig och engagerande studiecoach som hjälper en elev att plugga.
 Ämne: ${s.subject}. Elevens nivå: ${s.course}. Anpassa språk och svårighetsgrad efter den nivån.
 
@@ -717,7 +720,7 @@ Så coachar du:
 - Förklara enkelt, med exempel, och bygg vidare på det eleven redan kan.
 - När du förhör: ställ EN fråga i taget och vänta på svar. Ge sedan konkret feedback, rätta missförstånd vänligt och föreslå nästa steg.
 - Håll svaren korta (högst ca 150 ord) om eleven inte ber om mer.
-- Svara alltid på svenska.
+- Svara alltid på svenska.${prov}
 
 <material>
 ${s.material}
@@ -754,16 +757,17 @@ ${s.material}
     }
   }
 
-  function startStudy(focus) {
+  function startStudy(focus, report) {
     const s = validSetup(); if (!s) return;
     state.chat = []; $('#chatLog').replaceChildren();
+    state.studyReport = report || '';
     fc.cards = null; fc.i = 0; fc.focus = focus || '';
     tx.lang = langFor(s.subject); $('#textTab').hidden = !tx.lang; resetText();
     setMode('chat');
     $('#studyTitle').textContent = s.subject + ' – ' + s.course;
     show('study');
-    const first = focus
-      ? 'Jag gjorde ett prov och behöver träna mer på detta:\n' + focus + '\nHjälp mig med det. Börja med att förklara det viktigaste kort och ställ sedan en fråga till mig.'
+    const first = (focus || report)
+      ? 'Jag gjorde ett prov och vill plugga vidare.' + (focus ? ' Jag behöver träna mer på detta:\n' + focus + '\n' : '\n') + 'Titta på hur det gick för mig och hjälp mig med det. Börja med att säga kort hur det gick och förklara det viktigaste, och ställ sedan en fråga till mig.'
       : 'Hej! Jag vill börja plugga. Hälsa kort och föreslå hur vi kan börja.';
     state.chat.push({ role: 'user', content: first });
     sendChat();
@@ -1246,6 +1250,17 @@ Svara ENBART med JSON:
     if (!r.weak.length) weak.append(el('li', { text: 'Inga tydliga svaga punkter. Bra jobbat!' }));
     r.weak.forEach((w) => weak.append(el('li', {}, el('strong', { text: String(w.topic || '') }), el('span', { text: String(w.advice || '') }))));
     state.weak = r.weak.map((w) => '- ' + w.topic + (w.advice ? ': ' + w.advice : '')).join('\n');
+    const cut = (t, n) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+    state.report = 'Betyg ' + r.grade + ', ' + r.total + ' av ' + max + ' poäng (' + r.pct + ' %).' +
+      (r.summary ? '\nLärarens omdöme: ' + r.summary : '') +
+      (state.weak ? '\n\nBehöver träna mer på:\n' + state.weak : '') +
+      '\n\nFrågor och svar:\n' + r.review.map(({ q, got, comment, answer }) => {
+        const yours = q.type === 'flerval' ? (Number.isInteger(answer) ? q.options[answer] : '(obesvarad)') : ((answer && answer.trim()) || '(obesvarad)');
+        return 'Fråga ' + q.id + ' (' + q.topic + '): ' + got + ' av ' + q.points + ' p. ' + cut(q.question, 300) +
+          '\n  Elevens svar: ' + cut(yours, 300) +
+          (got < q.points ? '\n  ' + (q.type === 'flerval' ? 'Rätt svar: ' + q.options[q.correct] : 'Exempel på bra svar: ' + cut(q.model_answer, 300)) : '') +
+          (comment ? '\n  Kommentar: ' + cut(comment, 200) : '');
+      }).join('\n');
 
     const list = $('#reviewList'); list.replaceChildren();
     r.review.forEach(({ q, got, comment, answer }) => {
@@ -1290,7 +1305,7 @@ Svara ENBART med JSON:
   $('#studyExit').addEventListener('click', () => show('home'));
   $('#homeFromResultBtn').addEventListener('click', () => show('home'));
   $('#retryBtn').addEventListener('click', startExam);
-  $('#studyFromResultBtn').addEventListener('click', () => startStudy(state.weak));
+  $('#studyFromResultBtn').addEventListener('click', () => startStudy(state.weak, state.report));
   $('#studyBtn').addEventListener('click', () => startStudy(''));
   $('#examBtn').addEventListener('click', startExam);
   $('#prevBtn').addEventListener('click', () => { if (state.cur > 0) goQ(state.cur - 1); });
