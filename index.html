@@ -95,6 +95,15 @@
   .chatForm { display: flex; gap: 10px; align-items: flex-end; border-top: 1px solid var(--border); padding-top: 16px; }
   .chatForm textarea { min-height: 52px; max-height: 180px; height: 52px; }
 
+  /* Plugga text */
+  .textHelp { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
+  #textSrc { min-height: 200px; }
+  .ovRow { display: grid; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+  .ovBg, .ovTa { grid-area: 1 / 1; align-self: start; font: inherit; font-size: 17px; line-height: 1.6; padding: 6px 8px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ovBg { color: #A7B6B0; pointer-events: none; user-select: none; }
+  .ovTa { width: 100%; height: auto; background: transparent; border: 0; border-radius: 8px; color: var(--ink); resize: none; overflow: hidden; }
+  .ovTa:focus { box-shadow: none; background: rgba(31,107,87,.06); }
+
   /* Prov */
   .examTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
   .examTitle { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
@@ -268,6 +277,7 @@
     <div class="modeTabs" id="modeTabs">
       <button type="button" class="primary" data-mode="chat" aria-pressed="true">Chatt</button>
       <button type="button" data-mode="cards" aria-pressed="false">Flashcards</button>
+      <button type="button" data-mode="text" id="textTab" aria-pressed="false" hidden>Plugga text</button>
     </div>
     <div id="chatLog" aria-live="polite"></div>
     <div class="chips" id="chips">
@@ -294,6 +304,23 @@
         <button type="button" class="ghost" id="fcPrev">← Förra</button>
         <button type="button" class="primary" id="fcFlip">Visa svar</button>
         <button type="button" class="ghost" id="fcNext">Nästa →</button>
+      </div>
+    </div>
+    <div id="textPane" hidden>
+      <div id="textStep1">
+        <label for="textSrc">Klistra in din text</label>
+        <p class="textHelp" id="textHelp1"></p>
+        <textarea id="textSrc" spellcheck="false" placeholder="Klistra in din text på svenska här…"></textarea>
+        <div class="actions" style="margin-top:16px">
+          <button type="button" class="primary" id="textGo" disabled>Börja skriva</button>
+        </div>
+      </div>
+      <div id="textStep2" hidden>
+        <p class="textHelp" id="textHelp2"></p>
+        <div id="textBlocks"></div>
+        <div class="actions" style="margin-top:20px">
+          <button type="button" id="textReset">Börja om</button>
+        </div>
       </div>
     </div>
   </section>
@@ -451,6 +478,7 @@
 
   const $ = (s) => document.querySelector(s);
   const fc = { cards: null, i: 0, focus: '' };   // flashcards i pluggläget
+  const tx = { lang: null };                     // 'Plugga text': språket (null = fliken visas inte)
   const state = { s: null, exam: null, answers: {}, chat: [], weak: '', abort: null, timer: null, t0: 0, limit: 0, grading: false, cur: 0, usedSec: 0 };
 
   /* ---------- Hjälpfunktioner ---------- */
@@ -722,7 +750,9 @@ ${s.material}
   function startStudy(focus) {
     const s = validSetup(); if (!s) return;
     state.chat = []; $('#chatLog').replaceChildren();
-    fc.cards = null; fc.i = 0; fc.focus = focus || ''; setMode('chat');
+    fc.cards = null; fc.i = 0; fc.focus = focus || '';
+    tx.lang = langFor(s.subject); $('#textTab').hidden = !tx.lang; resetText();
+    setMode('chat');
     $('#studyTitle').textContent = s.subject + ' – ' + s.course;
     show('study');
     const first = focus
@@ -735,8 +765,9 @@ ${s.material}
   /* ---------- Plugga-läge: flashcards ---------- */
   function setMode(m) {
     const cards = m === 'cards';
-    for (const id of ['chatLog', 'chips', 'chatForm']) $('#' + id).hidden = cards;
+    for (const id of ['chatLog', 'chips', 'chatForm']) $('#' + id).hidden = m !== 'chat';
     $('#cardsPane').hidden = !cards;
+    $('#textPane').hidden = m !== 'text';
     document.querySelectorAll('#modeTabs button').forEach((b) => {
       const on = b.dataset.mode === m;
       b.classList.toggle('primary', on);
@@ -809,6 +840,56 @@ ${s.material}
     const n = fc.i + d;
     if (n < 0 || n >= fc.cards.length) return;
     fc.i = n; renderCard();
+  }
+
+  /* ---------- Plugga-läge: plugga text (moderna språk, ej engelska) ---------- */
+  const LANGS = {
+    spanska: 'spanska', spanish: 'spanska', franska: 'franska', french: 'franska', tyska: 'tyska', german: 'tyska',
+    italienska: 'italienska', italian: 'italienska', ryska: 'ryska', russian: 'ryska', portugisiska: 'portugisiska',
+    kinesiska: 'kinesiska', mandarin: 'kinesiska', japanska: 'japanska', arabiska: 'arabiska', nederländska: 'nederländska',
+    holländska: 'nederländska', turkiska: 'turkiska', polska: 'polska', finska: 'finska', danska: 'danska', norska: 'norska',
+    grekiska: 'grekiska', koreanska: 'koreanska', hindi: 'hindi', persiska: 'persiska', vietnamesiska: 'vietnamesiska'
+  };
+  // Returnerar {name} om ämnet är ett modernt språk (ej engelska), annars null. name är null vid "moderna språk".
+  function langFor(subject) {
+    const tokens = String(subject || '').toLowerCase().split(/[^a-zåäö]+/).filter(Boolean);
+    if (tokens.includes('engelska') || tokens.includes('english')) return null;
+    for (const t of tokens) if (LANGS[t]) return { name: LANGS[t] };
+    if (tokens.includes('moderna') || tokens.includes('modernt') || tokens.includes('språk')) return { name: null };
+    return null;
+  }
+  const onLang = () => 'på ' + ((tx.lang && tx.lang.name) || 'språket du pluggar');
+
+  function fitOv(ta) {                          // textrutan växer så att den täcker både din text och den svenska bakom
+    const bg = ta.previousElementSibling;
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(ta.scrollHeight, bg.offsetHeight) + 'px';
+  }
+  function fitAllOv() { document.querySelectorAll('#textBlocks .ovTa').forEach(fitOv); }
+
+  function resetText() {
+    $('#textSrc').value = '';
+    $('#textBlocks').replaceChildren();
+    $('#textStep1').hidden = false; $('#textStep2').hidden = true;
+    $('#textGo').disabled = true;
+    $('#textHelp1').textContent = 'Klistra in en text på svenska. Sedan skriver du den ' + onLang() + ', direkt ovanpå den svenska texten som syns svagt (genomskinligt) bakom.';
+  }
+
+  function startTextWork() {
+    const raw = $('#textSrc').value.trim();
+    if (!raw) return;
+    const parts = raw.split(/\n+|(?<=[.!?…])\s+(?=[A-ZÅÄÖ¿¡"“0-9])/).map((x) => x.trim()).filter(Boolean);
+    const box = $('#textBlocks'); box.replaceChildren();
+    parts.forEach((t) => {
+      const bg = el('div', { class: 'ovBg', text: t, 'aria-hidden': 'true' });
+      const ta = el('textarea', { class: 'ovTa', rows: '1', spellcheck: 'false', 'aria-label': 'Skriv ' + onLang() + ': ' + t });
+      ta.addEventListener('input', () => fitOv(ta));
+      box.append(el('div', { class: 'ovRow' }, bg, ta));
+    });
+    $('#textHelp2').textContent = 'Skriv varje mening ' + onLang() + ' ovanpå den svaga svenska texten.';
+    $('#textStep1').hidden = true; $('#textStep2').hidden = false;
+    fitAllOv();
+    const first = box.querySelector('.ovTa'); if (first) first.focus({ preventScroll: true });
   }
 
   /* ---------- Prov: skapa ---------- */
@@ -1204,6 +1285,14 @@ Svara ENBART med JSON:
   $('#modeTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode);
   });
+  $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); });
+  $('#textGo').addEventListener('click', startTextWork);
+  $('#textReset').addEventListener('click', () => {
+    const typed = [...document.querySelectorAll('#textBlocks .ovTa')].some((t) => t.value.trim());
+    if (typed && !confirm('Vill du börja om? Det du har skrivit försvinner.')) return;
+    resetText(); $('#textSrc').focus();
+  });
+  window.addEventListener('resize', () => { if (!$('#textStep2').hidden) fitAllOv(); });
   $('#fcFlip').addEventListener('click', flipCard);
   $('#fcPrev').addEventListener('click', () => stepCard(-1));
   $('#fcNext').addEventListener('click', () => stepCard(1));
