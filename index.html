@@ -97,7 +97,7 @@
 
   /* Plugga text */
   .textHelp { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
-  #textSrc { min-height: 200px; }
+  #textSrc { height: calc(1.55em + 26px); line-height: 1.55; resize: none; max-height: 60vh; overflow-y: auto; }
   .textTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .textTop .textHelp { margin: 0; flex: 1 1 240px; }
   .ovRow { display: grid; margin-bottom: 12px; background: var(--field); border: 1px solid var(--border); border-radius: 12px; }
@@ -312,9 +312,8 @@
     </div>
     <div id="textPane" hidden>
       <div id="textStep1">
-        <label for="textSrc">Klistra in din text</label>
-        <p class="textHelp" id="textHelp1"></p>
-        <textarea id="textSrc" spellcheck="false" placeholder="Klistra in din text här (vilket språk som helst)…"></textarea>
+        <label for="textSrc" id="textLabel">Klistra in din text</label>
+        <textarea id="textSrc" rows="1" spellcheck="false" placeholder="Klistra in texten här…"></textarea>
         <div class="actions" style="margin-top:16px">
           <button type="button" class="primary" id="textGo" disabled>Börja skriva</button>
         </div>
@@ -872,6 +871,12 @@ ${s.material}
     ta.style.height = 'auto';
     ta.style.height = Math.max(ta.scrollHeight, bg.offsetHeight) + 'px';
   }
+  function fitSrc() {                           // klistra-in-rutan växer som meningsrutorna
+    const ta = $('#textSrc');
+    if (!ta.offsetParent) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight + 2, window.innerHeight * 0.6) + 'px';
+  }
   function fitAllOv() { document.querySelectorAll('#textBlocks .ovTa').forEach(fitOv); }
 
   function resetText() {
@@ -881,7 +886,8 @@ ${s.material}
     $('#textGo').disabled = true;
     $('#textBlocks').classList.remove('hideSv');
     $('#textToggle').textContent = 'Stäng av svenska texten'; $('#textToggle').setAttribute('aria-pressed', 'false');
-    $('#textHelp1').textContent = 'Klistra in en text på vilket språk du vill. Den översätts automatiskt till svenska och syns svagt bakom när du skriver. Du skriver den sedan ' + onLang() + '.';
+    $('#textSrc').style.height = '';
+    $('#textLabel').textContent = 'Klistra in din ' + ((tx.lang && tx.lang.name) ? tx.lang.name + ' ' : '') + 'text';
   }
 
   function transPrompt(chunk) {
@@ -1324,7 +1330,7 @@ Svara ENBART med JSON:
   $('#modeTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode);
   });
-  $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); });
+  $('#textSrc').addEventListener('input', () => { $('#textGo').disabled = !$('#textSrc').value.trim(); fitSrc(); });
   $('#textGo').addEventListener('click', startTextWork);
   $('#textToggle').addEventListener('click', () => {
     const off = $('#textBlocks').classList.toggle('hideSv');
