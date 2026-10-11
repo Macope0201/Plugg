@@ -450,6 +450,44 @@
   // Antal poäng som krävs för en gräns (litet avdrag för att undvika avrundningsfel)
   const pointsNeeded = (max, t) => Math.ceil(max * t / 100 - 1e-9);
 
+  // Årskursnummer i grundskolan (4–9). Ger 0 för gymnasiet, högskola eller om inget är valt.
+  const gradeNum = (s) => {
+    if (!s || s.level !== 'grundskola') return 0;
+    const m = String(s.grade || '').match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  };
+  // Regel som alltid gäller i provet: man kan inte läsa texten under ett prov
+  const NO_TEXT_REF = 'Eleven har INTE tillgång till någon text eller något material under provet. Skriv därför aldrig "Från texten …", "Enligt texten …", "Titta i texten", "Läs i texten", "Som det står i texten" eller liknande. Varje fråga och varje tips måste kunna förstås och besvaras utan att läsa någon text.';
+  // Ordval och frågelängd för provfrågor
+  function examStyleRule(s) {
+    const g = gradeNum(s);
+    if (g >= 4 && g <= 6) {
+      return `- Språk för åk ${g}: Använd lätta, vardagliga ord som en elev i åk ${g} förstår. Förklara eller undvik svåra ord. Gör frågorna lite kortare, helst en kort mening (högst två). Frågorna ska ändå vara LIKA SVÅRA i innehållet som annars: det är bara orden och längden som ska bli enklare, inte kunskapen som krävs. Fackord som hör till ämnet (t.ex. begrepp eleven ska kunna) får finnas kvar.
+- Gör provet likt ett riktigt svenskt skolprov för åk 4–6: korta och tydliga frågor, till exempel "Vad kallas …?", "Förklara vad … betyder.", "Ge två exempel på …", "Varför … ?", "Vad är skillnaden mellan … och …?", "Vilka orsaker fanns till …?". Blanda faktafrågor med frågor där eleven förklarar och jämför, så som lärare brukar ställa dem.`;
+    }
+    const prov79 = `- Gör provet likt ett riktigt svenskt skolprov för åk 7–9: frågorna ska pröva kunskap, förståelse och förmåga att resonera, så som lärare ställer dem. Blanda till exempel "Förklara vad … betyder.", "Beskriv hur …", "Redogör för …", "Jämför … och …", "Vilka orsaker och konsekvenser hade …?", "Varför … ? Motivera ditt svar.", "Diskutera …" och "Ge exempel på …". De sista frågorna ska kräva längre, utvecklade resonemang med flera led (orsak, förklaring, slutsats), medan de första är grundläggande kunskapsfrågor.`;
+    if (g === 7) {
+      return '- Språk för åk 7: Använd lätta ord och undvik onödigt svåra ord. Håll frågorna tydliga och inte onödigt långa. Svårigheten i innehållet ska inte sänkas.\n' + prov79;
+    }
+    if (g === 8 || g === 9) return prov79;
+    return '';
+  }
+  // SO-ämne i åk 7–9 (Historia, Geografi, Religionskunskap, Samhällskunskap, SO): då läggs en "Extra fråga" till sist
+  function soExtra(s) {
+    const g = gradeNum(s);
+    if (g < 7 || g > 9) return false;
+    const tokens = String(s.subject || '').toLowerCase().split(/[^a-zåäö]+/).filter(Boolean);
+    return tokens.some((t) => t === 'so' || t === 'historia' || t === 'geografi' || t.startsWith('religion') || t.startsWith('samhäll'));
+  }
+  const qLabel = (q) => (q.extra ? 'Extra fråga' : 'Fråga ' + q.id);
+  // Ordval för tips-knappen
+  function hintStyleRule(s) {
+    const g = gradeNum(s);
+    if (g >= 4 && g <= 6) return `Använd mycket lätta ord som en elev i åk ${g} förstår, och korta meningar.`;
+    if (g >= 7 && g <= 9) return `Använd medelsvåra ord som passar åk ${g}. Inga svåra eller krångliga ord.`;
+    return 'Använd inga svåra eller krångliga ord. Skriv enkelt och tydligt.';
+  }
+
   const LEVELS = {
     grundskola:  { label: 'Grundskola', grades: ['Årskurs 4', 'Årskurs 5', 'Årskurs 6', 'Årskurs 7', 'Årskurs 8', 'Årskurs 9'] },
     gymnasiet:   { label: 'Gymnasiet', grades: ['Årskurs 1', 'Årskurs 2', 'Årskurs 3'] },
@@ -952,7 +990,9 @@ ${JSON.stringify(chunk)}
   /* ---------- Prov: skapa ---------- */
   function examPrompt(s) {
     const n = s.count;
-    return `Skapa ett skriftligt prov i ämnet "${s.subject}" för elever på nivån "${s.course}", med exakt ${n} frågor.
+    const style = examStyleRule(s);
+    const extra = soExtra(s);
+    return `Skapa ett skriftligt prov i ämnet "${s.subject}" för elever på nivån "${s.course}", med exakt ${n} frågor${extra ? ' (plus en extra fråga sist, se reglerna)' : ''}.
 
 Regler:
 - Använd ENDAST innehållet i underlaget nedan. Täck så stor del av underlaget som möjligt.
@@ -960,7 +1000,8 @@ Regler:
 - Gör provet så likt ett riktigt skolprov som möjligt: en blandning av frågetyper och stigande svårighetsgrad (från grundläggande kunskap till resonemang och tillämpning).
 - Fördelning ungefär: 40 % "flerval" (4 alternativ, exakt ett rätt, rimliga felalternativ), 40 % "kort" (svar på 1–3 meningar, 2–3 poäng) och 20 % "lang" (utförligt resonerande svar, 4–6 poäng). Flerval ger 1 poäng.
 - Frågorna ska vara tydliga, entydiga och på svenska. Skriv aldrig svaret i frågan.
-- "topic" är ett kort ämnesområde (2–4 ord) som frågan testar.
+- ${NO_TEXT_REF}
+${style ? style + '\n' : ''}${extra ? `- Lägg dessutom till EN extra fråga allra sist, alltså totalt ${n + 1} frågor. Den ska vara av typen "kort" eller "lang" och bygga på underlaget. Du bestämmer själv hur många poäng den ger, men högst 3 poäng (1, 2 eller 3). Den är frivillig för eleven och räknas som bonuspoäng ovanpå provet.\n` : ''}- "topic" är ett kort ämnesområde (2–4 ord) som frågan testar.
 
 Svara ENBART med JSON, utan förklaringar eller markdown, i exakt detta format:
 {"questions":[
@@ -982,7 +1023,7 @@ ${s.material}
       const data = await withRetry(() => callClaude({
         system: 'Du är en erfaren lärare som konstruerar rättvisa, tydliga prov. Du svarar bara med giltig JSON.',
         messages: [{ role: 'user', content: examPrompt(s) }],
-        maxTokens: Math.min(30000, 4000 + s.count * 900),
+        maxTokens: Math.min(30000, 4000 + (s.count + (soExtra(s) ? 1 : 0)) * 900),
         json: true
       }).then(parseJSON));
       const qs = (data.questions || []).map((q, i) => {
@@ -1002,7 +1043,12 @@ ${s.material}
         };
       }).filter((q) => q.question);
       if (qs.length < 1) throw new Error('Inga frågor skapades. Försök igen.');
-      state.exam = { questions: qs, max: qs.reduce((a, q) => a + q.points, 0) };
+      if (soExtra(s) && qs.length > s.count) {         // SO i åk 7–9: sista frågan är "Extra fråga", max 3 poäng
+        const ex = qs[qs.length - 1];
+        ex.extra = true;
+        ex.points = Math.min(3, ex.points);
+      }
+      state.exam = { questions: qs, max: qs.filter((q) => !q.extra).reduce((a, q) => a + q.points, 0) };   // extra frågan är bonus och räknas inte in i max
       state.answers = {};
       renderExam();
       show('exam');
@@ -1067,7 +1113,7 @@ ${s.material}
     const q = exam.questions[i];
     const area = $('#qArea'); area.replaceChildren();
     area.append(
-      el('div', { class: 'qhead' }, el('span', { class: 'qnum', text: 'Fråga ' + q.id }), el('span', { class: 'pts', text: q.points + ' poäng' })),
+      el('div', { class: 'qhead' }, el('span', { class: 'qnum', text: qLabel(q) }), el('span', { class: 'pts', text: q.extra ? 'Frivillig: upp till ' + q.points + ' bonuspoäng' : q.points + ' poäng' })),
       el('p', { class: 'qtext', text: q.question })
     );
     if (q.type === 'flerval') {
@@ -1120,6 +1166,8 @@ Hemligt facit (får ALDRIG avslöjas, varken direkt eller indirekt): ${facit}
 
 Regler:
 - Skriv en kort ledtråd på 1–2 meningar, på svenska, anpassad till nivån.
+- ${hintStyleRule(s)}
+- ${NO_TEXT_REF}
 - Avslöja inte svaret. Nämn inte heller något nyckelbegrepp, namn, årtal eller ord som står i facit.
 - Vid flervalsfråga: peka inte ut och stryk inget alternativ, och nämn inga bokstäver.
 - Hjälp eleven att komma på det själv, till exempel genom att peka på vad frågan egentligen handlar om, vilken del av ämnet eleven ska tänka på, eller ställ en vägledande motfråga.
@@ -1153,7 +1201,10 @@ ${s.material}
   async function submitExam(auto) {
     if (state.grading) return;
     const { exam } = state;
-    const missing = exam.questions.length - answeredCount();
+    const missing = exam.questions.filter((q) => {   // den extra frågan är frivillig och räknas inte som obesvarad
+      const a = state.answers[q.id];
+      return !q.extra && !(q.type === 'flerval' ? Number.isInteger(a) : !!(a && a.trim()));
+    }).length;
     if (auto !== true && missing > 0 && !confirm('Du har ' + missing + ' obesvarade frågor. Vill du lämna in ändå? Du kan också gå tillbaka och svara först.')) return;
     state.grading = true;
     clearInterval(state.timer);
@@ -1206,7 +1257,7 @@ Svara ENBART med JSON:
         total += got;
         return { q, got, comment, answer: a };
       });
-      const pct = exam.max ? Math.round((total / exam.max) * 100) : 0;
+      const pct = exam.max ? Math.min(100, Math.round((total / exam.max) * 100)) : 0;
       renderResult({ total, pct, grade: gradeFor(total, exam.max), review,
         weak: Array.isArray(data.weak_topics) ? data.weak_topics : [], summary: String(data.summary || '') });
       show('result');
@@ -1236,8 +1287,10 @@ Svara ENBART med JSON:
     $('#summary').textContent = r.summary;
 
     const stats = $('#stats'); stats.replaceChildren();
-    const full = r.review.filter((x) => x.got === x.q.points).length;
-    [['Poäng', r.total + ' / ' + max], ['Helt rätt', full + ' av ' + r.review.length + ' frågor'], ['Tid', mmss(state.usedSec || 0)]]
+    const baseRev = r.review.filter((x) => !x.q.extra);
+    const full = baseRev.filter((x) => x.got === x.q.points).length;
+    const bonus = r.review.filter((x) => x.q.extra).reduce((a, x) => a + x.got, 0);
+    [['Poäng', r.total + ' / ' + max + (bonus ? ' (varav ' + bonus + ' bonus)' : '')], ['Helt rätt', full + ' av ' + baseRev.length + ' frågor'], ['Tid', mmss(state.usedSec || 0)]]
       .forEach(([k, v]) => stats.append(el('div', { class: 'stat' }, el('span', { text: k }), el('strong', { text: v }))));
 
     // Betygsgränser: lägsta betyget först (t.ex. EG, G, MG, AG eller F, E, D, C, B, A)
@@ -1256,7 +1309,7 @@ Svara ENBART med JSON:
       (state.weak ? '\n\nBehöver träna mer på:\n' + state.weak : '') +
       '\n\nFrågor och svar:\n' + r.review.map(({ q, got, comment, answer }) => {
         const yours = q.type === 'flerval' ? (Number.isInteger(answer) ? q.options[answer] : '(obesvarad)') : ((answer && answer.trim()) || '(obesvarad)');
-        return 'Fråga ' + q.id + ' (' + q.topic + '): ' + got + ' av ' + q.points + ' p. ' + cut(q.question, 300) +
+        return qLabel(q) + ' (' + q.topic + '): ' + got + ' av ' + q.points + ' p. ' + cut(q.question, 300) +
           '\n  Elevens svar: ' + cut(yours, 300) +
           (got < q.points ? '\n  ' + (q.type === 'flerval' ? 'Rätt svar: ' + q.options[q.correct] : 'Exempel på bra svar: ' + cut(q.model_answer, 300)) : '') +
           (comment ? '\n  Kommentar: ' + cut(comment, 200) : '');
@@ -1267,7 +1320,7 @@ Svara ENBART med JSON:
       const kind = got === q.points ? 'full' : got > 0 ? 'part' : 'none';
       const yours = q.type === 'flerval' ? (Number.isInteger(answer) ? q.options[answer] : '(obesvarad)') : ((answer && answer.trim()) || '(obesvarad)');
       const div = el('div', { class: 'review ' + kind },
-        el('div', { class: 'got', text: 'Fråga ' + q.id + ': ' + got + ' av ' + q.points + ' poäng' }),
+        el('div', { class: 'got', text: qLabel(q) + ': ' + got + ' av ' + q.points + ' poäng' }),
         el('p', { text: q.question }),
         el('p', { text: 'Ditt svar: ' + yours })
       );
