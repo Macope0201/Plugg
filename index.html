@@ -439,8 +439,10 @@
   /* ---------- Betygssystem (Kunskapsskolan) ----------
      Årskurs 4–5:  EG / G / MG / AG
      Övriga nivåer (årskurs 6–9, gymnasiet, högskola): F–A
-     Gränserna anges som procent av max poäng. */
-  const LIMITS = [['A', 90], ['B', 80], ['C', 70], ['D', 60], ['E', 50]];                       // F–A (under 50 % = F)
+     Gränserna anges som andel av max poäng. */
+  // F–A: baserat på NO åk 8 (max 35 p): E från 11 p, D från 16 p, C från 21 p, B från 26 p, A från 31 p. Under 11 p = F.
+  // Gränserna räknas om efter provets maxpoäng.
+  const LIMITS = [['A', 31 / 35 * 100], ['B', 26 / 35 * 100], ['C', 21 / 35 * 100], ['D', 16 / 35 * 100], ['E', 11 / 35 * 100]];
   // Baserat på ett riktigt Historieprov i åk 5 (max 36 p): G från 16 p, MG från 21 p, AG från 27 p
   const LIMITS_LOW = [['AG', 27 / 36 * 100], ['MG', 21 / 36 * 100], ['G', 16 / 36 * 100]];     // åk 4–5 (under G = EG)
   const LOW_GRADES = ['Årskurs 4', 'Årskurs 5'];
